@@ -112,7 +112,7 @@ wrangler.jsonc           Cloudflare Workers の設定。静的アセットを配
 
 ## 出典・ライセンス
 
-ソースコードは [MIT License](LICENSE)。地図データは以下のとおりそれぞれ別のライセンス。
+ソースコードは [MIT License](LICENSE)。地図データは以下のとおりそれぞれ別のライセンスで、MIT は適用されない（リポジトリに入っている `public/rivers/`・`public/karte/` も、各フォルダの `README.txt` のライセンスに従う）。
 
 - [地理院タイル](https://maps.gsi.go.jp/development/ichiran.html)（白地図・淡色地図・陰影起伏図・標高タイル）、地理院 逆ジオコーダ（国土地理院）
 - 河川線と名前: [© OpenStreetMap contributors](https://www.openstreetmap.org/copyright)（[ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/)）
