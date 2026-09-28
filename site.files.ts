@@ -48,7 +48,7 @@ Ryuiki Tansaku Map ("ryuiki" means watershed / drainage basin, "tansaku" means e
 ソースコードは [MIT License](${SITE.repo}/blob/main/LICENSE)。地図データは出典ごとに次のライセンス。
 
 - [地理院タイル](https://maps.gsi.go.jp/development/ichiran.html)（白地図・淡色地図・陰影起伏図・標高タイル）、地理院 逆ジオコーダ（国土地理院）
-- 河川線と名前: [© OpenStreetMap contributors](https://www.openstreetmap.org/copyright)（ODbL 1.0）。変換した河川タイルも ODbL で提供: ${SITE.url}rivers/README.txt
+- 河川線と名前: [© OpenStreetMap contributors](https://www.openstreetmap.org/copyright)（ODbL 1.0）。変換した河川タイルも ODbL で提供: ${SITE.url}rivers/README.txt 。日本の河川線の多くは国土数値情報（河川データ、国土交通省）を2012年に同省の了承を得て OpenStreetMap に取り込んだもの。国土数値情報の河川データは現在「非商用」の条件で提供されており、このアプリも非商用で利用している
 - 海域: Flanders Marine Institute (2018). IHO Sea Areas, version 3（[Marine Regions](https://www.marineregions.org/)、CC BY 4.0）
 - 流域サマリの人口: 「国勢調査」2010・2015・2020年 1kmメッシュ（総務省統計局、[e-Stat](https://www.e-stat.go.jp/gis)）を加工して作成
 - 流域サマリの土地の使われ方: © ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium（CC BY 4.0）
