@@ -1,0 +1,26 @@
+name: 不具合の報告
+description: 動かない、表示がおかしい、流れの向きが実際と違う など
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: 何が起きたか
+      description: 期待していた結果との違いも書いてもらえると助かります
+    validations:
+      required: true
+  - type: input
+    id: url
+    attributes:
+      label: 地点の URL
+      description: 「この結果を共有する」で得られる `?p=経度,緯度` 付きの URL があれば貼ってください
+      placeholder: https://ryuiki-map.ykns.workers.dev/?p=139.1,35.8
+  - type: input
+    id: env
+    attributes:
+      label: 使っている環境
+      placeholder: iPhone / Safari、Windows / Chrome など
+  - type: textarea
+    id: extra
+    attributes:
+      label: スクリーンショットなど

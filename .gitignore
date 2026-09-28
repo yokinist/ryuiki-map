@@ -1,0 +1,30 @@
+# prod
+dist/
+
+# caches
+*.tsbuildinfo
+.vite/
+.wrangler
+
+# 河川データ・海域データの取得キャッシュと生成物（scripts/build-*.ts で再生成できる）
+.cache/
+public/rivers/
+public/karte/
+
+# エディタ・エージェントの個人設定
+.claude/
+
+# deps
+node_modules/
+
+# env
+.env
+.env.*
+!.env.example
+.dev.vars
+
+# logs
+*.log
+
+# misc
+.DS_Store

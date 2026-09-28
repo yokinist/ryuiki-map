@@ -1,0 +1,832 @@
+html,
+body,
+#map {
+  margin: 0;
+  height: 100%;
+}
+body {
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: var(--font-size-md) / var(--line-height) var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+p {
+  margin: 0;
+}
+
+/* ---- パネル ---- */
+.panel {
+  --pad: var(--space-4);
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  width: 320px;
+  max-height: calc(100% - 56px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  box-sizing: border-box;
+  padding: var(--pad);
+  background: var(--color-surface-glass);
+  backdrop-filter: blur(8px);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-panel);
+}
+@media (max-width: 480px) {
+  .panel {
+    right: var(--space-3);
+    width: auto;
+    max-height: 50%;
+    /* 画面の半分を覆うので、雨粒を追って地図が毎フレーム動く間のぼかしの再計算が重い。背景はほぼ不透明なので見た目は変わらない */
+    backdrop-filter: none;
+  }
+  /* 「アプリについて・利用上の注意」を読む間は、地図より文章を優先してパネルを伸ばす */
+  .panel:has(.about[open]) {
+    max-height: calc(100% - 56px);
+  }
+  /* スマホは指で拡大縮小できるので、パネルと重なる拡大縮小ボタンは出さない */
+  .maplibregl-ctrl-top-right {
+    display: none;
+  }
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.04em;
+}
+/* 雨粒の形のマーク（角を1つだけ尖らせた円を45°回す） */
+.brand__mark {
+  width: 10px;
+  height: 10px;
+  border-radius: 50% 0 50% 50%;
+  background: var(--color-water-strong);
+  transform: rotate(-45deg);
+}
+.panel__lead {
+  margin-top: var(--space-2);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
+}
+/* 結果が出たら説明はたたんで、結果に場所を譲る */
+.panel[data-state="result"] .panel__lead {
+  display: none;
+}
+
+/* ---- 状態の表示。読み込み・計算中は小さなスピナーを出す ---- */
+.status {
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+  margin-top: var(--space-2);
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-sm);
+}
+.status[data-busy]::before {
+  content: "";
+  flex: none;
+  width: 10px;
+  height: 10px;
+  box-sizing: border-box;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-drop);
+  border-radius: var(--radius-full);
+  animation: spin 0.8s linear infinite;
+}
+/* スマホでは結果を出している間、パネルの高さを結果に譲る */
+@media (max-width: 480px) {
+  .panel[data-state="result"] .status {
+    display: none;
+  }
+}
+@keyframes spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+/* ---- 旅の見出し。パネルをスクロールしても上に残る ---- */
+.journey {
+  position: sticky;
+  top: calc(-1 * var(--pad));
+  z-index: 1;
+  margin: var(--space-2) calc(-1 * var(--pad)) 0;
+  padding: var(--space-3) var(--pad);
+  /* 下をスクロールしていく時系列が透けないよう不透明に */
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+.journey__origin {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-sm);
+}
+.journey__headline {
+  margin: 2px 0 0;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
+}
+.journey__meter {
+  height: 4px;
+  margin-top: var(--space-2);
+  overflow: hidden;
+  background: var(--color-drop-soft);
+  border-radius: var(--radius-full);
+}
+.journey__bar {
+  height: 100%;
+  background: var(--color-drop);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+.journey__progress {
+  margin-top: var(--space-1);
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+.journey__progress b {
+  color: var(--color-ink);
+  font-weight: var(--font-weight-medium);
+}
+/* 調べている間は、行ったり来たりするバーで「待てば何か起きる」ことを示す */
+.journey[data-loading] .journey__bar {
+  width: 35%;
+  animation: indeterminate 1.2s var(--ease-out) infinite;
+}
+@keyframes indeterminate {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(290%);
+  }
+}
+/* 到着したら結論を強調し、進み具合のバーは役目を終えて消える */
+.journey[data-arrived] .journey__headline {
+  color: var(--color-drop);
+  animation: settle var(--duration-slow) var(--ease-out);
+}
+.journey[data-arrived] .journey__meter {
+  height: 0;
+  margin-top: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition:
+    opacity var(--duration-slow) var(--ease-out),
+    height var(--duration-slow) var(--ease-out),
+    margin-top var(--duration-slow) var(--ease-out);
+}
+@keyframes settle {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* ---- ボタン ---- */
+.button {
+  font: inherit;
+  cursor: pointer;
+}
+.button--primary {
+  width: 100%;
+  margin-top: var(--space-3);
+  padding: 10px var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--color-drop);
+  color: var(--color-surface);
+  font-weight: var(--font-weight-medium);
+  box-shadow: var(--shadow-1);
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    filter var(--duration-fast) var(--ease-out);
+  animation: settle var(--duration-slow) var(--ease-out);
+}
+.button--primary:hover {
+  filter: brightness(1.06);
+}
+.button--primary:active {
+  transform: scale(0.98);
+}
+/* 主操作（流域サマリ）に添える、控えめな操作（上流へさかのぼる・下流へくだる） */
+.button--secondary {
+  width: 100%;
+  margin-top: var(--space-3);
+  padding: 9px var(--space-3);
+  border: 1px solid var(--color-water);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-water-strong);
+  font-weight: var(--font-weight-medium);
+  transition: background var(--duration-fast) var(--ease-out);
+}
+.button--secondary:hover {
+  background: var(--color-water-soft);
+}
+/* 共有はもう主操作ではないので、下線だけの控えめなリンクにする */
+.button--link {
+  display: block;
+  width: fit-content;
+  margin-top: var(--space-3);
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-sm);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  animation: settle var(--duration-slow) var(--ease-out);
+}
+/* display: block は hidden 属性（非表示）より強いので、隠すときは明示する */
+.button--link[hidden] {
+  display: none;
+}
+.button--link:hover,
+.button--link:focus-visible {
+  color: var(--color-water-strong);
+}
+/* コピーできたら色を変えて、押した結果をボタン自体で返す */
+.button--link[data-copied="ok"] {
+  color: var(--color-water-strong);
+}
+.button--link[data-copied="failed"] {
+  color: var(--color-warn);
+}
+.button:focus-visible,
+.karte__close:focus-visible,
+.karte-card__remove:focus-visible,
+.route__summary:focus-visible,
+.about__summary:focus-visible,
+.about a:focus-visible {
+  outline: 2px solid var(--color-water);
+  outline-offset: 2px;
+}
+
+/* ---- 時系列。開閉できる欄に入れる ---- */
+.route__summary {
+  margin-top: var(--space-2);
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+.timeline {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0 0 0 var(--space-4);
+  border-left: 2px solid var(--color-border);
+}
+.timeline__item {
+  --dot: 9px;
+  position: relative;
+  margin-bottom: var(--space-2);
+  animation: enter var(--duration-base) var(--ease-out);
+}
+.timeline__item::before {
+  content: "";
+  position: absolute;
+  top: 6px;
+  left: calc(-1 * var(--space-4) - 2px - var(--dot) / 2 + 1px);
+  width: var(--dot);
+  height: var(--dot);
+  box-sizing: border-box;
+  border: 2px solid var(--color-ink-muted); /* 図形も背景と 3:1 以上のコントラストに */
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+}
+.timeline__title {
+  display: block;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-tight);
+}
+.timeline__sub {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+}
+/* 川の合流は大きい印と濃い文字色で区別する。帯にすると地名の並びから浮くので、現れた瞬間だけ淡く光らせる */
+.timeline__item--river {
+  --dot: 14px;
+  animation:
+    enter var(--duration-base) var(--ease-out),
+    flash var(--duration-slow) var(--ease-out);
+}
+.timeline__item--river::before {
+  top: 4px;
+  left: calc(-1 * var(--space-4) - 2px - var(--dot) / 2 + 1px);
+  border: 3px solid var(--color-surface);
+  background: var(--color-water);
+  box-shadow: 0 0 0 1px var(--color-water);
+}
+.timeline__item--river .timeline__title {
+  color: var(--color-water-strong);
+}
+.timeline__item--river .timeline__sub {
+  color: var(--color-water-strong);
+  opacity: 0.8;
+}
+/* ダムは川の帯ほど目立たせず、地名と区別できる四角い印と濃い水色の文字にする（堤で川をせき止めるイメージ） */
+.timeline__item--dam::before {
+  border-color: var(--color-water-strong);
+  border-radius: 2px;
+  background: var(--color-water-strong);
+}
+.timeline__item--dam .timeline__title {
+  color: var(--color-water-strong);
+}
+/* 支流の合流（水の来た道）は、たどっている川の名前が変わるわけではないので輪だけにして控えめに */
+.timeline__item--branch::before {
+  border-color: var(--color-water);
+  background: var(--color-surface);
+}
+.timeline__item--branch .timeline__title {
+  color: var(--color-water);
+}
+.timeline__item--end::before {
+  border-color: var(--color-drop);
+  background: var(--color-drop);
+}
+.timeline__item--end .timeline__title {
+  color: var(--color-drop);
+  font-size: var(--font-size-lg);
+}
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+}
+@keyframes flash {
+  from {
+    background: color-mix(in srgb, var(--color-water) 22%, transparent);
+    border-radius: var(--radius-sm);
+  }
+}
+
+/* ---- 到着後：流域サマリへの導線 ---- */
+.summary {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+  animation: settle var(--duration-slow) var(--ease-out);
+}
+/* 用語の説明を開く「？」。吹き出しにせずパネルの流れの中に行を足すので、画面外にはみ出さない */
+.help {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  margin-left: var(--space-1);
+  padding: 0;
+  cursor: pointer;
+  border: 1px solid var(--color-ink-faint);
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--color-ink-muted);
+  font-size: 10px;
+  line-height: 1;
+}
+.help:hover,
+.help:focus-visible {
+  border-color: var(--color-water-strong);
+  color: var(--color-water-strong);
+}
+.help__text {
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-water-soft);
+  color: var(--color-water-strong);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height);
+  animation: enter var(--duration-base) var(--ease-out);
+}
+/* さかのぼった結果の補足（小さな水路・平地） */
+.source-note p {
+  margin: var(--space-2) 0;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-sm);
+}
+
+/* 河口まで追えなかったときの注意書き */
+.note {
+  margin-bottom: var(--space-2);
+  color: var(--color-warn);
+  font-size: var(--font-size-sm);
+}
+
+/* ---- 地図上の雨粒。波紋を広げて「今ここを流れている」ことを示す ---- */
+.drop {
+  position: relative;
+  width: 12px;
+  height: 12px;
+  box-sizing: border-box;
+  border: 2px solid var(--color-surface);
+  border-radius: var(--radius-full);
+  background: var(--color-drop);
+  box-shadow: var(--shadow-1);
+}
+.drop::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border: 2px solid var(--color-drop);
+  border-radius: var(--radius-full);
+  animation: ripple 1.6s var(--ease-out) infinite;
+}
+@keyframes ripple {
+  from {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(3);
+  }
+}
+
+/* ---- 地図コントロール ---- */
+.maplibregl-ctrl-group {
+  border: 0;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-1);
+}
+.maplibregl-ctrl-group button {
+  width: 32px;
+  height: 32px;
+}
+.maplibregl-ctrl-attrib,
+.maplibregl-ctrl-scale {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-xs);
+  background: rgb(255 255 255 / 0.88);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-1);
+}
+.maplibregl-ctrl-attrib {
+  max-width: min(280px, calc(100vw - 2 * var(--space-4)));
+}
+.maplibregl-ctrl-attrib a {
+  color: var(--color-water-strong);
+  /* maplibre のデフォルトは下線なし。他のリンクと同じく下線を付ける */
+  text-decoration: underline;
+}
+
+/* ---- 地図上の短いお知らせ（海をクリックしたときなど） ---- */
+.hint .maplibregl-popup-content {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-ink);
+  color: var(--color-surface);
+  font:
+    var(--font-weight-medium) var(--font-size-md) / var(--line-height-tight)
+    var(--font-sans);
+  box-shadow: var(--shadow-panel);
+  white-space: nowrap;
+  animation: settle var(--duration-base) var(--ease-out);
+}
+.hint .maplibregl-popup-tip {
+  border-top-color: var(--color-ink);
+  border-bottom-color: var(--color-ink);
+}
+
+/* ---- 流域サマリ。海までと上流を1枚のカードにまとめる ---- */
+.karte {
+  box-sizing: border-box;
+  width: min(560px, calc(100% - 2 * var(--space-4)));
+  max-height: calc(100% - 2 * var(--space-4));
+  padding: var(--space-4);
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-panel);
+}
+/* 開くときは下からふわっと現れ、閉じるときは少し沈みながら薄れる（背景の暗がりも一緒に） */
+.karte::backdrop {
+  background: rgb(16 24 40 / 0.35);
+  animation: fade-in var(--duration-base) var(--ease-out);
+}
+.karte[open] {
+  animation: karte-in var(--duration-base) var(--ease-out);
+}
+.karte[data-closing] {
+  animation: karte-out var(--duration-base) var(--ease-in) forwards;
+}
+.karte[data-closing]::backdrop {
+  animation: fade-out var(--duration-base) var(--ease-in) forwards;
+}
+@keyframes karte-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+}
+@keyframes karte-out {
+  to {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+/* カードが縦に長くてもスクロール中に閉じられるよう、見出しは上に貼り付ける */
+.karte__header {
+  position: sticky;
+  top: calc(-1 * var(--space-4));
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: calc(-1 * var(--space-4)) calc(-1 * var(--space-4)) 0;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+}
+.karte__title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+}
+/* 試作段階であることを、アプリ名の直後に少し控えめに添える */
+.beta {
+  color: var(--color-ink-muted);
+  font-weight: var(--font-weight-medium);
+}
+.karte__lead {
+  margin-top: 2px;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-sm);
+}
+.karte__close {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--color-ink-muted);
+  font: inherit;
+  font-size: var(--font-size-lg);
+  line-height: 1;
+  cursor: pointer;
+}
+.karte__close:hover {
+  background: var(--color-border);
+  color: var(--color-ink);
+}
+.karte__body {
+  margin-top: var(--space-3);
+}
+.karte-card {
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+}
+.karte-card__header {
+  position: relative;
+}
+.karte-card__title {
+  margin: 0;
+  color: var(--color-water-strong);
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-tight);
+}
+.karte-card__busy {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  color: var(--color-ink);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+.karte-card__busy::before {
+  content: "";
+  flex: none;
+  width: 12px;
+  height: 12px;
+  box-sizing: border-box;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-drop);
+  border-radius: var(--radius-full);
+  animation: spin 0.8s linear infinite;
+}
+.karte-skel {
+  display: block;
+  height: 1.15em;
+  width: 42%;
+  border-radius: var(--radius-sm);
+  background: var(--color-border);
+  animation: karte-pulse 1.2s ease-in-out infinite;
+}
+@keyframes karte-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+.karte-card__place {
+  margin-top: 2px;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-xs);
+}
+/* 「海まで」「この地点より上流」の見出し。線と色付きの文字で区切る */
+.karte-group__title {
+  margin: var(--space-4) 0 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-water-strong);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+}
+/* まとまりの中の行は線で区切らず、余白と「小さく薄い見出し＋大きく濃い値」の強弱で区切る */
+.karte-row {
+  padding-top: var(--space-3);
+}
+.karte-row__label {
+  margin: 0 0 2px;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+}
+.karte-row__value {
+  display: grid;
+  gap: 2px;
+}
+.karte-big {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--line-height-tight);
+}
+.karte-sub {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-xs);
+}
+.karte-size {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 0.2em;
+}
+.land-bar {
+  display: flex;
+  height: 8px;
+  margin-top: var(--space-1);
+  overflow: hidden;
+  border-radius: var(--radius-full);
+}
+.land-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--space-2);
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-xs);
+}
+.land-legend .land {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 3px;
+  border-radius: 2px;
+}
+.land--0 {
+  background: var(--color-land-forest);
+}
+.land--1 {
+  background: var(--color-land-crop);
+}
+.land--2 {
+  background: var(--color-land-built);
+}
+.land--3 {
+  background: var(--color-land-grass);
+}
+.land--4 {
+  background: var(--color-land-water);
+}
+.land--5 {
+  background: var(--color-land-other);
+}
+@media (max-width: 480px) {
+  .karte {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    margin: 0;
+    border-radius: 0;
+  }
+}
+
+/* ---- アプリについて・出典 ---- */
+.about {
+  scroll-margin: var(--pad);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-sm);
+}
+/* 「アプリについて・利用上の注意」「出典・ライセンス」の間は、区切り線を重ねず余白だけにする */
+.about + .about {
+  padding-top: 0;
+  border-top: 0;
+}
+.about__summary {
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+.about[open] .about__summary {
+  margin-bottom: var(--space-2);
+}
+.about__heading {
+  margin: var(--space-2) 0 var(--space-1);
+  color: var(--color-ink);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+.about__list {
+  margin: 0;
+  padding-left: var(--space-4);
+}
+.about__list li + li {
+  margin-top: var(--space-1);
+}
+.about a {
+  /* --color-water は白地で 4.2:1 と文字には薄いので、濃い方を使う */
+  color: var(--color-water-strong);
+  word-break: break-all;
+}
+
+/* ---- 動きを減らす設定のときは、動きの時間のトークンをほぼ0にする（アニメーションはどれもトークンを参照している）。
+   雨粒の速さは rain.ts が合わせる ---- */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 1ms;
+    --duration-base: 1ms;
+    --duration-slow: 1ms;
+    --duration-camera: 0ms;
+  }
+  .drop::after {
+    display: none;
+  }
+  .karte-card__busy::before,
+  .karte-skel {
+    animation: none;
+  }
+}
+
+/* ---- アクセシビリティ ---- */
+/* 画面には出さず、読み上げだけに使う */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+/* キーボードで地図にフォーカスしたときの枠と照準 */
+.maplibregl-canvas:focus-visible {
+  outline: 3px solid var(--color-water-strong);
+  outline-offset: -3px;
+}
+.crosshair {
+  position: absolute;
+  z-index: 1;
+  width: 28px;
+  height: 28px;
+  margin: -14px 0 0 -14px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-out);
+  background:
+    linear-gradient(var(--color-drop), var(--color-drop)) center / 2px 100%
+    no-repeat,
+    linear-gradient(var(--color-drop), var(--color-drop)) center / 100% 2px
+    no-repeat;
+  filter: drop-shadow(0 0 1px var(--color-surface))
+    drop-shadow(0 0 1px var(--color-surface));
+}
+#map[data-keyboard] .crosshair {
+  opacity: 1;
+}

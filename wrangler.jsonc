@@ -1,0 +1,10 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ryuiki-map",
+  "compatibility_date": "2026-09-01",
+  // ページと public/（河川・流域サマリのデータ含む）を静的アセットとして配るだけで、Worker のコードは持たない。
+  // OGP 画像のような動的なルートが要るときは main を足す
+  "assets": {
+    "not_found_handling": "single-page-application"
+  }
+}

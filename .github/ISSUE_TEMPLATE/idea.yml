@@ -1,0 +1,15 @@
+name: 改善の提案
+description: 機能の追加や、使い勝手の改善のアイデア
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: 提案の内容
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: なぜあると良いか
+      description: どんな場面で困ったか、何ができるようになるか

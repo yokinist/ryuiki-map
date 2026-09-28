@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <!-- {{キー}} は site.config.ts の値に置き換わる -->
+    <title>{{name}}{{stage}}</title>
+    <meta name="description" content="{{description}}" />
+    <meta name="theme-color" content="{{themeColor}}" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="canonical" href="{{url}}" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="{{url}}" />
+    <meta property="og:site_name" content="{{name}}" />
+    <meta property="og:title" content="{{name}}{{stage}}" />
+    <meta property="og:description" content="{{description}}" />
+    <meta property="og:image" content="{{ogImage}}" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="{{ogImageAlt}}" />
+    <meta property="og:locale" content="ja_JP" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="{{name}}{{stage}}" />
+    <meta name="twitter:description" content="{{description}}" />
+    <meta name="twitter:image" content="{{ogImage}}" />
+    <meta name="twitter:image:alt" content="{{ogImageAlt}}" />
+  </head>
+  <body>
+    <div id="map" aria-describedby="map-help">
+      <!-- キーボードで地図にフォーカスしたとき、Enter で雨の流れをたどる位置を示す照準 -->
+      <div class="crosshair" id="crosshair" aria-hidden="true"></div>
+    </div>
+    <p class="visually-hidden" id="map-help">矢印キーで地図を動かし、プラスとマイナスのキーで拡大・縮小できます。Enter キーを押すと、照準の位置に降った雨の流れをたどります。選べるのは日本国内の陸地だけです。</p>
+    <!-- 雨の流れをたどり始めたときと、たどり着いたときの結論だけを読み上げる（進み具合は毎フレーム変わるので読み上げない） -->
+    <p class="visually-hidden" id="announce" aria-live="polite"></p>
+    <aside class="panel" id="panel">
+      <h1 class="brand"><span class="brand__mark" aria-hidden="true"></span><span>{{name}}<span class="beta">{{stage}}</span></span></h1>
+      <p class="panel__lead">地図をクリックして、そこに降った雨の流れを海までたどってみましょう。</p>
+      <p class="status" id="status" role="status">拡大すると川が表示され、カーソルをのせるとそこからの流れが見えます。</p>
+      <section id="result" hidden>
+        <div class="journey" id="journey">
+          <p class="journey__origin" id="origin"></p>
+          <h2 class="journey__headline" id="headline">ここに降った雨は…</h2>
+          <div class="journey__meter" aria-hidden="true"><div class="journey__bar" id="bar"></div></div>
+          <p class="journey__progress" id="progress" aria-live="off"></p>
+        </div>
+        <!-- スマホでは到着後にたたみ、地図（到着点）を見せる -->
+        <details class="route" id="route" name="trail" open>
+          <summary class="route__summary">雨の通り道</summary>
+          <ol class="timeline" id="timeline" aria-label="雨の通り道"></ol>
+        </details>
+        <!-- 「上流へさかのぼる」で、クリック地点の水がどこから来たかを水源まで並べる。雨の通り道とは name で束ね、同時に1つだけ開く -->
+        <details class="route" id="source" name="trail" hidden>
+          <summary class="route__summary">水の来た道</summary>
+          <ol class="timeline" id="source-timeline" aria-label="水の来た道"></ol>
+          <!-- 集まる範囲が小さい・平地のときの補足 -->
+          <div class="source-note" id="source-note"></div>
+        </details>
+        <div class="summary" id="summary" hidden></div>
+        <button type="button" class="button button--link" id="share" hidden>この結果を共有する</button>
+      </section>
+      <!-- アプリについて・出典とライセンスは別々のトグルにし、name で束ねて同時に1つまでしか開かないようにする -->
+      <details class="about" id="about" name="info">
+        <summary class="about__summary">アプリについて・利用上の注意</summary>
+        <p>個人（<a href="https://github.com/yokinist" target="_blank" rel="noopener">yokinist</a>）が非商用で開発している、日本に降った雨がどの流域を通ってどの海へ流れ着くかをたどれる探索マップです。ソースコードは <a href="{{repo}}" target="_blank" rel="noopener">GitHub</a> で公開しています。不具合の報告や改善の提案（<a href="{{repo}}/issues" target="_blank" rel="noopener">Issue</a>）、Pull Request を歓迎します。</p>
+        <h2 class="about__heading">利用上の注意</h2>
+        <ul class="about__list">
+          <li>試作段階のアプリです。データや計算に誤りが含まれている可能性があります。</li>
+          <li>対象は日本国内の陸地です（標高・河川データの範囲）。国外や遠く離れた海は選べません。</li>
+          <li>流れの向きは標高タイル（約10〜120mメッシュ）から計算した推定です。平地・市街地・用水路のある場所では実際と異なることがあります。</li>
+          <li>川の名前と河川線は OpenStreetMap のものです。日本の河川線の多くは国土数値情報（河川データ）2006年度版を取り込んだもので、その後の改修や名称の変更は反映されていないことがあります。</li>
+          <li>地区名は地理院の逆ジオコーダによる大字単位の目安です。</li>
+          <li>海の名前は国際水路機関（IHO）の海域区分によります。関東以西の太平洋側（IHO の区分ではフィリピン海）も太平洋と表示しています。</li>
+          <li>所要時間は流速1m/sと仮定したおおよその目安です。</li>
+          <li>流域サマリの人口は1kmメッシュの人口を面積で按分した推定、土地の使われ方は衛星画像の分類（約70mに縮小して集計）、年間降水量は範囲の中心1地点の再解析値で、どれも目安です。ダム・堰は OpenStreetMap に登録されているものだけを数え、雨の通り道・水の来た道には流路から約250m以内のものを出しています。</li>
+          <li>防災・測量・ナビゲーションなど、正確さが求められる用途には使えません。</li>
+        </ul>
+      </details>
+      <details class="about" id="sources" name="info">
+        <summary class="about__summary">出典・ライセンス</summary>
+        <p>ソースコードは <a href="{{repo}}/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a>（同梱ライブラリのライセンスは <a href="/licenses.md" target="_blank">/licenses.md</a>）。地図データは出典ごとに次のライセンス。</p>
+        <ul class="about__list">
+          <li>
+            <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>（白地図・淡色地図・陰影起伏図・標高タイル）、地理院 逆ジオコーダ（国土地理院）
+          </li>
+          <li>
+            河川線と名前: <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a>。<a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener">ODbL</a> のもとで利用し、地図表示と流向計算のために変換したデータ（<a href="/rivers/README.txt" target="_blank">/rivers/</a>）も ODbL で提供しています。日本の河川線の多くは「国土数値情報（河川データ）」（国土交通省）を OpenStreetMap に取り込んだものです。
+          </li>
+          <li>
+            海域: Flanders Marine Institute (2018). IHO Sea Areas, version 3（<a href="https://www.marineregions.org/" target="_blank" rel="noopener">Marine Regions</a>、<a href="https://creativecommons.org/licenses/by/4.0/deed.ja" target="_blank" rel="noopener">CC BY 4.0</a>）を日本周辺で切り抜き・簡略化して使用
+          </li>
+          <li>
+            流域サマリの人口: 「国勢調査」2010・2015・2020年 1kmメッシュ（総務省統計局、<a href="https://www.e-stat.go.jp/gis" target="_blank" rel="noopener">e-Stat</a>）を加工して作成
+          </li>
+          <li>
+            流域サマリの土地の使われ方: © ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium（<a href="https://esa-worldcover.org/" target="_blank" rel="noopener">ESA WorldCover</a>、<a href="https://creativecommons.org/licenses/by/4.0/deed.ja" target="_blank" rel="noopener">CC BY 4.0</a>）を1kmメッシュ単位に集計（<a href="/karte/README.txt" target="_blank">/karte/</a>）
+          </li>
+          <li>
+            流域サマリの年間降水量: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Weather data by Open-Meteo.com</a>（<a href="https://creativecommons.org/licenses/by/4.0/deed.ja" target="_blank" rel="noopener">CC BY 4.0</a>。Copernicus Climate Change Service の ERA5 を含む）
+          </li>
+          <li>
+            ダム・堰（流域サマリ・雨の通り道）: <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a>（ODbL）
+          </li>
+        </ul>
+        <p>データの利用に問題があれば <a href="mailto:info@yokinist.me">info@yokinist.me</a> までご連絡ください。</p>
+      </details>
+    </aside>
+    <!-- 流域サマリ: 海までの通り道と、地点より上流の集水域を1枚にまとめる -->
+    <dialog class="karte" id="karte" aria-labelledby="karte-title" aria-describedby="karte-lead">
+      <header class="karte__header">
+        <div>
+          <h2 class="karte__title" id="karte-title">流域サマリ</h2>
+          <p class="karte__lead" id="karte-lead">雨の流れをたどった地点から海まで、およびその地点より上流の集水域について、公開データから推計した目安をまとめます。</p>
+        </div>
+        <button type="button" class="karte__close" id="karte-close" aria-label="閉じる">×</button>
+      </header>
+      <div class="karte__body" id="karte-body"></div>
+    </dialog>
+    <script type="module" src="/src/client/main.ts"></script>
+  </body>
+</html>

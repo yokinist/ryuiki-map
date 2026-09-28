@@ -1,0 +1,49 @@
+{
+  "name": "ryuiki-map",
+  "description": "地点に降った雨の行き先と、水の来た道をたどれる探索マップ",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "homepage": "https://ryuiki-map.ykns.workers.dev/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yokinist/ryuiki-map.git"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "pnpm run build && vite preview",
+    "deploy": "pnpm run build && wrangler deploy",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "check": "biome check .",
+    "format": "biome format --write .",
+    "build:rivers": "node scripts/build-rivers.ts",
+    "build:karte": "node scripts/build-karte.ts",
+    "build:seas": "node scripts/build-seas.ts",
+    "build:hill": "node scripts/build-hill-index.ts",
+    "build:og": "node scripts/build-og.ts"
+  },
+  "dependencies": {
+    "maplibre-gl": "^5.0.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.10",
+    "@cloudflare/vite-plugin": "^1.44.0",
+    "@resvg/resvg-js": "^2.6.2",
+    "@types/geojson": "^7946.0.16",
+    "@types/node": "^24.0.0",
+    "geotiff": "^3.0.5",
+    "typescript": "^7.0.2",
+    "vite": "^8.1.4",
+    "vitest": "^4.1.11",
+    "wrangler": "^4.110.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "workerd"
+    ]
+  }
+}

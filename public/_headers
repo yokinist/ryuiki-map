@@ -1,0 +1,29 @@
+# ファイル名にハッシュが入り、中身が変われば URL も変わる（vite のビルド出力）。1年キャッシュしてよい
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+# 河川タイルは版（日付）ごとのフォルダに置くので、中身が変われば URL も変わる。1年キャッシュしてよい
+/rivers/:version/*
+  Cache-Control: public, max-age=31536000, immutable
+/karte/:version/*
+  Cache-Control: public, max-age=31536000, immutable
+# 地図の欧文フォント。中身は変えないので長くキャッシュしてよい
+/fonts/*
+  Cache-Control: public, max-age=2592000
+# 日本語を含むテキスト。本番の静的アセットは text/plain を charset なしで返し、ブラウザが文字化けするので明示する
+/llms.txt
+  Content-Type: text/plain; charset=utf-8
+/robots.txt
+  Content-Type: text/plain; charset=utf-8
+/rivers/README.txt
+  Content-Type: text/plain; charset=utf-8
+# 今の版を指すファイルだけは短く
+/rivers/latest.json
+  Cache-Control: public, max-age=300
+/karte/latest.json
+  Cache-Control: public, max-age=300
+/karte/README.txt
+  Content-Type: text/plain; charset=utf-8
+/karte/:version/meshes/README.txt
+  Content-Type: text/plain; charset=utf-8
+/karte/:version/dams/README.txt
+  Content-Type: text/plain; charset=utf-8
