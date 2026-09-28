@@ -6,10 +6,8 @@ dist/
 .vite/
 .wrangler
 
-# 河川データ・海域データの取得キャッシュと生成物（scripts/build-*.ts で再生成できる）
+# 河川データ・流域サマリ用データの取得キャッシュ（生成物の public/rivers/・public/karte/ は git で管理する）
 .cache/
-public/rivers/
-public/karte/
 
 # エディタ・エージェントの個人設定
 .claude/

@@ -20,10 +20,16 @@
 
 ```sh
 pnpm install
-pnpm build:rivers 139_35  # まず試すなら1タイル（東京付近の1°四方）だけ取る。数分で済み、公開 API への負荷も小さい
-pnpm build:rivers       # 全国を使うとき。OpenStreetMap の河川線（全国100タイル）を Overpass API で取得して public/rivers/ に変換（40〜60分）
-pnpm build:karte        # 初回のみ。流域サマリ用の人口・土地・ダムのデータを public/karte/ に作る（約1時間）
 pnpm dev
+```
+
+河川データ（`public/rivers/`）と流域サマリ用のデータ（`public/karte/`）は生成済みのものがリポジトリに入っているので、データを作らずにそのまま動く。
+
+データの作り直しは、全国分を取り直すときだけ行う（公開 API に長時間問い合わせる）。
+
+```sh
+pnpm build:rivers       # 全国の河川線を OpenStreetMap（Overpass API）から取り直す（40〜60分）
+pnpm build:karte        # 流域サマリ用の人口・土地・ダムのデータを作り直す（約1時間）
 ```
 
 | コマンド | 内容 |
@@ -93,7 +99,7 @@ src/client/              ページ（ブラウザ側）
   styles/                tokens.css（デザイントークン）と app.css
 scripts/                 データの作成（河川: build-rivers.ts、流域サマリ: build-karte.ts、海域: build-seas.ts、陰影の欠けタイル: build-hill-index.ts、共有時の画像: build-og.ts、Overpass API の問い合わせ: overpass.ts）
 assets/                  配信しない素材（共有時の画像の右側の地図 og-map.png）
-public/                  静的ファイル（seas.json、_headers、地図の欧文フォント fonts/、アイコン・OGP 画像。河川タイル rivers/ と流域サマリ karte/ は生成物で git 管理外）
+public/                  静的ファイル（seas.json、_headers、地図の欧文フォント fonts/、アイコン・OGP 画像。河川タイル rivers/ と流域サマリ karte/ は生成物だが git で管理する）
 site.config.ts           サイト名・説明・URL・構造化データ。index.html の {{キー}} に差し込む
 site.files.ts            robots.txt・sitemap.xml・llms.txt（AI 向けのサイト説明）。ビルド時に書き出す
 wrangler.jsonc           Cloudflare Workers の設定。静的アセットを配るだけで Worker のコードは持たない

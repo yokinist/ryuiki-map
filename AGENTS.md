@@ -33,9 +33,9 @@
 
 ## データと外部サービス
 
-- `public/rivers/` は `pnpm build:rivers` の生成物で git 管理外。変換のやり直しは `pnpm build:rivers --pack`。引数なしの全国取得は Overpass API に40〜60分問い合わせ続けるので、頼まれたときだけ走らせる
+- `public/rivers/` は `pnpm build:rivers` の生成物だが git で管理する（作り直したらコミットする。古い版のフォルダはスクリプトが消す）。変換のやり直しは `pnpm build:rivers --pack`。引数なしの全国取得は Overpass API に40〜60分問い合わせ続けるので、頼まれたときだけ走らせる
 - 地理院の逆ジオコーダへの問い合わせは `config.ts` の `GEOCODER`（同時4件）と、`data/places.ts` の間引き（川の区間ごとに最大3地点）の範囲に収める
-- `public/karte/` は `pnpm build:karte` の生成物で git 管理外。まとめ直しは `pnpm build:karte --pack`。全国の取得は e-Stat・WorldCover・Overpass に約1時間問い合わせるので、頼まれたときだけ走らせる（取得済みの分は `.cache/` から再利用する）
+- `public/karte/` は `pnpm build:karte` の生成物だが git で管理する（`public/rivers/` と同じ）。まとめ直しは `pnpm build:karte --pack`。全国の取得は e-Stat・WorldCover・Overpass に約1時間問い合わせるので、頼まれたときだけ走らせる（取得済みの分は `.cache/` から再利用する）
 - 流域サマリの降水量（Open-Meteo）は、サマリを開いたときだけ1回問い合わせる。地図を動かすたびに問い合わせるような使い方はしない（無料枠は非商用・1日1万回）
 - OSM 由来の河川データは ODbL。地図の出典表示（`config.ts` の `ATTRIBUTION`）と、河川タイルに添える `README.txt` を保つ
 
