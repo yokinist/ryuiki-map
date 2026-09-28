@@ -6,6 +6,10 @@
 
 変更を終えたら `pnpm typecheck && pnpm check && pnpm test` を通す。`index.html`・`vite.config.ts`・`site.*.ts`・`wrangler.jsonc` を触ったら `pnpm build` も（CI は4つとも走らせる）。
 
+## 公開
+
+`main` に push すると、GitHub Actions が CI（型チェック・Lint・テスト・ビルド）のあとに Cloudflare Workers へデプロイする（`.github/workflows/ci.yml`）。手元の `pnpm deploy` は、Actions を待たずに出したいときだけ使う。
+
 ## 書き方
 
 - コメント・UI の文言・テスト名は日本語。UI では専門用語を言い換える（流路 →「雨の通り道」）。ただし「集水域」はそのまま使い、意味は「？」の説明で補う（`ui/dom.ts` の `helpButtonAndText`）

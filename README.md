@@ -42,7 +42,7 @@ pnpm build:karte        # 流域サマリ用の人口・土地・ダムのデー
 | `pnpm build:seas` | 河口がどの海かを判定する海域データ（`public/seas.json`、約140KB）を作る。1回きりでよい |
 | `pnpm build:og` | 共有時の画像 `public/og.png` を `site.config.ts` の `name`・`stage`・`ogTagline` で描き直す（右の地図は `assets/og-map.png`）。文字は macOS のヒラギノで描く |
 | `pnpm build:hill` | 陰影起伏図で海だけのタイル（404 になる）の一覧（`src/client/map/hill-missing.json`）を作る。問い合わせずに済ませてコンソールのエラーを減らす。1回きりでよい |
-| `pnpm deploy` | ビルドして Cloudflare Workers へ公開 |
+| `pnpm deploy` | ビルドして Cloudflare Workers へ公開。ふだんは `main` への push で GitHub Actions が行う |
 
 ## しくみ
 
