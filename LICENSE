@@ -19,11 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-このライセンスはソースコードに適用されます。地図データ（河川線・海域区分・人口・
-土地の使われ方・降水量・ダムと堰）には適用されません。特に public/rivers/ と
-public/karte/ のデータは MIT ではなく、各フォルダの README.txt に書いたライセンス
-（OpenStreetMap 由来のものは ODbL 1.0）に従います。詳しくは README.md の
-「出典・ライセンス」を参照してください。

@@ -45,7 +45,7 @@ Ryuiki Tansaku Map ("ryuiki" means watershed / drainage basin, "tansaku" means e
 
 ## 出典・ライセンス
 
-ソースコードは [MIT License](${SITE.repo}/blob/main/LICENSE)。地図データは出典ごとに次のライセンス。
+ソースコードは [MIT License](${SITE.repo}/blob/main/LICENSE)。地図データは MIT ではなく、出典ごとに次のライセンス（${SITE.repo}/blob/main/NOTICE.md）。
 
 - [地理院タイル](https://maps.gsi.go.jp/development/ichiran.html)（白地図・淡色地図・陰影起伏図・標高タイル）、地理院 逆ジオコーダ（国土地理院）
 - 河川線と名前: [© OpenStreetMap contributors](https://www.openstreetmap.org/copyright)（ODbL 1.0）。変換した河川タイルも ODbL で提供: ${SITE.url}rivers/README.txt 。日本の河川線の多くは国土数値情報（河川データ、国土交通省）を2012年に同省の了承を得て OpenStreetMap に取り込んだもの。国土数値情報の河川データは現在「非商用」の条件で提供されており、このアプリも非商用で利用している
