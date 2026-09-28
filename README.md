@@ -12,9 +12,7 @@
 
 ## 参加する
 
-不具合の報告や「この地点の流れがおかしい」「こんな使い方をしたい」といった提案は [Issue](https://github.com/yokinist/ryuiki-map/issues) へ。Pull Request も歓迎します。
-
-流れの向きがおかしい地点を報告するときは、その地点の共有URL（`?p=経度,緯度` 付き）を添えてもらえると再現できます。PR の前に `pnpm test`・`pnpm typecheck`・`pnpm check` が通ることを確認してください。
+不具合の報告や「この地点の流れがおかしい」「こんな使い方をしたい」といった提案は [Issue](https://github.com/yokinist/ryuiki-map/issues) へ。Pull Request も歓迎します。報告・開発のしかたと決まりは [CONTRIBUTING.md](CONTRIBUTING.md) にまとめています。
 
 ## 開発
 
