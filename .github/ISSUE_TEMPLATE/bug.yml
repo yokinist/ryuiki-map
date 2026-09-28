@@ -2,6 +2,10 @@ name: 不具合の報告
 description: 動かない、表示がおかしい、流れの向きが実際と違う など
 labels: [bug]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        自分で直したい・作りたい場合は、着手する前にこの Issue にコメントし、[CONTRIBUTING.md](https://github.com/yokinist/ryuiki-map/blob/main/CONTRIBUTING.md) を読んでください。
   - type: textarea
     id: what
     attributes:

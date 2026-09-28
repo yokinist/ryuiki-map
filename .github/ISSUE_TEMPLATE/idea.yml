@@ -2,6 +2,10 @@ name: 改善の提案
 description: 機能の追加や、使い勝手の改善のアイデア
 labels: [enhancement]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        自分で直したい・作りたい場合は、着手する前にこの Issue にコメントし、[CONTRIBUTING.md](https://github.com/yokinist/ryuiki-map/blob/main/CONTRIBUTING.md) を読んでください。
   - type: textarea
     id: idea
     attributes:
