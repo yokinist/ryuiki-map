@@ -18,7 +18,12 @@ import { maskRect, paint, setData, setImage } from "../map/overlays";
 import { pixel } from "../map/theme";
 import { type Grid, gridAt } from "../terrain/grid";
 import { snap, upstream } from "../terrain/hydro";
-import { type Path, traceToSea, traceToSource } from "../terrain/trace";
+import {
+  type Path,
+  refineSource,
+  traceToSea,
+  traceToSource,
+} from "../terrain/trace";
 import { FollowCamera } from "./camera";
 import { el } from "./dom";
 import { areaSize, eta, km } from "./format";
@@ -585,7 +590,16 @@ export class Rain {
     if (!alive() || !basin || this.showing !== "source") return;
     // クリック時の塗りは雨をたどった範囲の中だけなので、より広い範囲で数え直せたら塗り直す
     if (basin.g !== from.g) this.showBasin(basin.g, basin.s, alive, basin.up);
-    const src = traceToSource(basin.g, basin.s, basin.truncated);
+    // 雨をたどった範囲より粗い範囲で水源を探したときは、水源の位置だけ使い、線は細かい範囲で引き直す。
+    // クリック地点のそばを通らなければ、粗い道のりのまま出す
+    const coarse = traceToSource(basin.g, basin.s, basin.truncated);
+    const src =
+      basin.g === from.g
+        ? coarse
+        : ((await refineSource(coarse, from, basin.g, (text) => {
+            if (alive()) this.ui.progress.textContent = text;
+          }).catch(() => null)) ?? coarse); // 引き直しの地形を読めなくても、粗い線で続ける
+    if (!alive()) return;
     const n = src.pts.length;
     this.ui.route.open = false; // 下る旅はたたみ、さかのぼる道のりに目を移す
     this.ui.source.hidden = false;

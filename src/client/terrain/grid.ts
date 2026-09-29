@@ -101,14 +101,14 @@ export const gridAt = ([lon, lat]: LngLat) =>
   all().find((g) => g.toCell(lon, lat) >= 0);
 
 /** 端から margin セル以上内側にあるか（端ぎりぎりだと乗り換えた直後にまた外へ出てしまう） */
-function insideOf(g: GridSpec, [lon, lat]: LngLat, margin = 16) {
+export function insideOf(g: GridSpec, [lon, lat]: LngLat, margin = 16) {
   const [x, y] = g.toPixel(lon, lat);
   return x >= margin && y >= margin && x < g.W - margin && y < g.H - margin;
 }
 
-/** p を十分内側に含むグリッド。except は除く（出てきたばかりのグリッドに戻らないように） */
-export const gridAround = (p: LngLat, except?: Grid) =>
-  all().find((g) => g !== except && insideOf(g, p));
+/** p を十分内側（margin セル以上）に含むグリッド。except は除く（出てきたばかりのグリッドに戻らないように） */
+export const gridAround = (p: LngLat, except?: Grid, margin?: number) =>
+  all().find((g) => g !== except && insideOf(g, p, margin));
 
 /** p を中心に、ズーム z の標高タイルで縦横 tiles 枚分のグリッドを作る */
 export const buildAround = (

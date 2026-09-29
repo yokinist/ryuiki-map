@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { LngLat } from "../geo";
-import { joinIndex, type TraceGrid, traceDown, traceIn } from "./trace-core";
+import {
+  joinIndex,
+  reverseToSource,
+  type TraceGrid,
+  traceDown,
+  traceIn,
+} from "./trace-core";
 
 /**
  * 1行の格子（W×1）を「経度 x0〜」に置いた模型。down は右隣（x+1）へ。
@@ -180,6 +186,20 @@ describe("traceDown の cut: 途中で止める・細かい範囲に乗り換え
     expect(t.pts.map((p) => p[0])).toEqual([0.5, 1.5, 2.5, 2.5, 3.5, 4.5, 5.5]);
   });
 
+  it("abort を返した点で打ち切り、stopped にはならない（遠回りしすぎたら、つながらないとみなして早めにやめる）", async () => {
+    const a = row(0, 6, 5);
+    const t = await traceDown(
+      a,
+      0,
+      async () => null,
+      undefined,
+      (p) => (p[0] === 2.5 ? "abort" : null),
+    );
+    expect(t.stopped).toBe(false);
+    expect(t.toSea).toBe(false);
+    expect(t.pts.map((p) => p[0])).toEqual([0.5, 1.5, 2.5]);
+  });
+
   it("一度も stop にならなければ stopped は false（呼び出し側は粗い道のりに戻す）", async () => {
     const a = row(0, 4, 3);
     const t = await traceDown(
@@ -209,5 +229,57 @@ describe("joinIndex: 道のりが目標の地点のそばを通ったか", () =>
 
   it("どの点も半径の外なら -1", () => {
     expect(joinIndex(pts, [139.01, 36.01], 100)).toBe(-1);
+  });
+});
+
+describe("reverseToSource: 水源から下った道のりを逆向きにして、さかのぼる道にする", () => {
+  // 下り: 水源側の点 A から クリック地点側の点 D まで、100m ずつ
+  const down = {
+    pts: [
+      [0, 3],
+      [0, 2],
+      [0, 1],
+      [0, 0],
+    ] as LngLat[],
+    dist: [0, 100, 200, 300],
+    stopped: true,
+  };
+  // 粗い道のり（クリック地点から水源へ）。添字 2 から下り始め、その先 3・4 が水源までの短い区間
+  const coarse = {
+    pts: [
+      [0, 0],
+      [0, 1.5],
+      [0, 3],
+      [0, 3.5],
+      [0, 4],
+    ] as LngLat[],
+    dist: [0, 150, 300, 350, 400],
+  };
+
+  it("クリック地点が先頭、距離はクリック地点から測り、下り始めた点から水源までは粗い道のりを足す", () => {
+    const r = reverseToSource(down, coarse, 2);
+    expect(r?.pts).toEqual([
+      [0, 0],
+      [0, 1],
+      [0, 2],
+      [0, 3],
+      [0, 3.5],
+      [0, 4],
+    ]);
+    expect(r?.dist).toEqual([0, 100, 200, 300, 350, 400]);
+  });
+
+  it("始まりの地点を渡すと先頭に足し、そこからの距離で測る（止めた点とクリック地点のすき間を埋める）", () => {
+    // 止めた点 [0, 0] の 50m 手前（南）がクリック地点という想定で、[0, -0.00045]（約50m）を渡す
+    const r = reverseToSource(down, coarse, 2, [0, -0.00045]);
+    expect(r?.pts[0]).toEqual([0, -0.00045]);
+    expect(r?.pts[1]).toEqual([0, 0]);
+    expect(r?.dist[1]).toBeCloseTo(50, 0);
+    expect(r?.dist[2]).toBeCloseTo(150, 0);
+    expect(r?.offset).toBe(1); // 足した点の数（川の名前や支流の位置をその分ずらす）
+  });
+
+  it("クリック地点のそばを通らなかった（stopped でない）なら null。呼び出し側は粗い道のりのまま出す", () => {
+    expect(reverseToSource({ ...down, stopped: false }, coarse, 2)).toBeNull();
   });
 });
