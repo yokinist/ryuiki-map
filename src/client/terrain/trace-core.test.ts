@@ -89,3 +89,22 @@ describe("traceDown: 範囲の端に出たら次の範囲に乗り換えて続�
     expect(hops).toBe(8); // 上限まで乗り換えを試してから終わる
   });
 });
+
+describe("stepM: 行ごとのセルの大きさ（rowM）があれば、それで測る", () => {
+  it("北の行ほど短い。2つの行をまたぐときは平均", () => {
+    // 1x3 の縦の格子。行 0〜2 のセルの大きさが 80・90・100 m
+    const g: TraceGrid = {
+      W: 1,
+      H: 3,
+      cellM: 90,
+      rowM: (y) => 80 + 10 * y,
+      down: new Int32Array([1, 2, -1]),
+      elev: new Float32Array([10, 10, 10]),
+      acc: new Float32Array([1, 2, 3]),
+      lngLat: (c) => [0, c],
+      toCell: () => -1,
+    };
+    const t = traceIn(g, 0);
+    expect(t.dist).toEqual([0, 85, 180]);
+  });
+});

@@ -121,17 +121,21 @@ export function longestFlowKm(
   order: Int32Array,
   up: Uint8Array,
   W: number,
-  cellM: number,
+  /** セル1辺の長さ m。行 y ごとの長さ（緯度で変わる）を渡すと、2つの行の平均で測る */
+  cellM: number | ((y: number) => number),
   s: number,
 ): number {
+  const rowM = typeof cellM === "number" ? () => cellM : cellM;
   const dist = new Float32Array(down.length);
   let maxM = 0;
   for (const c of order) {
     if (!up[c] || c === s) continue;
     const d = down[c];
+    const yc = (c / W) | 0;
+    const yd = (d / W) | 0;
+    const m = (rowM(yc) + rowM(yd)) / 2;
     const dx = (c % W) - (d % W);
-    const dy = ((c / W) | 0) - ((d / W) | 0);
-    dist[c] = dist[d] + (dx !== 0 && dy !== 0 ? cellM * Math.SQRT2 : cellM);
+    dist[c] = dist[d] + (dx !== 0 && yc !== yd ? m * Math.SQRT2 : m);
     if (dist[c] > maxM) maxM = dist[c];
   }
   return maxM / 1000;

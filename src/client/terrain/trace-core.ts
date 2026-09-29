@@ -8,6 +8,8 @@ export interface TraceGrid {
   W: number;
   H: number;
   cellM: number;
+  /** 行 y のセル1辺の長さ m。なければ cellM で測る */
+  rowM?: (y: number) => number;
   down: Int32Array;
   elev: Float32Array;
   acc: Float32Array;
@@ -15,10 +17,13 @@ export interface TraceGrid {
   toCell: (lon: number, lat: number) => number;
 }
 
-/** 隣り合うセル p, q の間の距離 m */
+/** 隣り合うセル p, q の間の距離 m。セルの大きさは2つの行の平均（南北に長い範囲でも緯度ごとの大きさで測る） */
 export function stepM(g: TraceGrid, p: number, q: number) {
-  const diagonal = q % g.W !== p % g.W && ((q / g.W) | 0) !== ((p / g.W) | 0);
-  return diagonal ? g.cellM * Math.SQRT2 : g.cellM;
+  const yp = (p / g.W) | 0;
+  const yq = (q / g.W) | 0;
+  const m = g.rowM ? (g.rowM(yp) + g.rowM(yq)) / 2 : g.cellM;
+  const diagonal = q % g.W !== p % g.W && yp !== yq;
+  return diagonal ? m * Math.SQRT2 : m;
 }
 
 /** 1つのグリッド内で s から海（または範囲の端）まで */
