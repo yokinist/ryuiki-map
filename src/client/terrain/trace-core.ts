@@ -53,7 +53,8 @@ export const MAX_HOPS = 8;
 /**
  * s から海まで。グリッドの端に出たら next で得た次のグリッドに乗り換えて続きを追う（next が null なら止まる）。
  * onSegment: グリッドごとの区間を受け取る（川の名前を引くなど）。base は区間の先頭が全体の何点目か。
- * cut: 各点で呼び、"stop" ならそこで止め（stopped）、{ to } を返せば範囲の端を待たずにそのグリッドへ乗り換える。
+ * cut: 各点で呼び、"stop" ならそこで止め（stopped）、"abort" ならそこで打ち切り（stopped にしない）、
+ * { to } を返せば範囲の端を待たずにそのグリッドへ乗り換える。
  * r は乗り換え先で吸着させる半径（セル数）。省くと2セル
  */
 export async function traceDown<G extends TraceGrid>(
@@ -61,7 +62,7 @@ export async function traceDown<G extends TraceGrid>(
   s: number,
   next: (exit: LngLat, g: G) => Promise<G | null>,
   onSegment?: (g: G, cells: number[], base: number) => void,
-  cut?: (p: LngLat, g: G) => "stop" | { to: G; r?: number } | null,
+  cut?: (p: LngLat, g: G) => "stop" | "abort" | { to: G; r?: number } | null,
 ): Promise<{
   pts: LngLat[];
   dist: number[];
@@ -77,6 +78,7 @@ export async function traceDown<G extends TraceGrid>(
     const tr = traceIn(g, s);
     // 途中で止める・乗り換える点を探す（先頭の点は乗り換えてきた点なので見ない）
     let switchTo: { to: G; r?: number } | null = null;
+    let aborted = false;
     for (let i = 1; cut && i < tr.cells.length; i++) {
       const r = cut(g.lngLat(tr.cells[i]), g);
       if (!r) continue;
@@ -84,6 +86,7 @@ export async function traceDown<G extends TraceGrid>(
       tr.dist.length = i + 1;
       tr.toSea = false;
       if (r === "stop") stopped = true;
+      else if (r === "abort") aborted = true;
       else switchTo = r;
       break;
     }
@@ -94,7 +97,7 @@ export async function traceDown<G extends TraceGrid>(
     });
     off = dist[dist.length - 1];
     if (tr.toSea) toSea = true;
-    if (tr.toSea || stopped) break;
+    if (tr.toSea || stopped || aborted) break;
     const exit = pts[pts.length - 1];
     const n = switchTo?.to ?? (await next(exit, g));
     if (!n) break;
@@ -109,7 +112,7 @@ export async function traceDown<G extends TraceGrid>(
 }
 
 /** 2点間のおおよその距離 m（数百 m の判定用。緯度で経度方向を縮める平面近似） */
-function nearM([x1, y1]: LngLat, [x2, y2]: LngLat) {
+export function nearM([x1, y1]: LngLat, [x2, y2]: LngLat) {
   const k = Math.cos((((y1 + y2) / 2) * Math.PI) / 180);
   return Math.hypot((x2 - x1) * k, y2 - y1) * 111_320;
 }
@@ -117,4 +120,33 @@ function nearM([x1, y1]: LngLat, [x2, y2]: LngLat) {
 /** 道のり pts が target の半径 radiusM 以内を通った最初の点の添字。通らなければ -1 */
 export function joinIndex(pts: LngLat[], target: LngLat, radiusM: number) {
   return pts.findIndex((p) => nearM(p, target) <= radiusM);
+}
+
+/**
+ * 水源側から下った道のり down（クリック地点で止まったもの）を逆向きにして、クリック地点を先頭にした「さかのぼる道」にする。
+ * start（クリック地点）を渡すと先頭に足し、止めた点とのすき間を埋める。offset は先頭に足した点の数。
+ * 粗い道のり coarse（クリック地点から水源へ）で、下り始めた点 tip から先（水源まで）の短い区間は、そのまま足す。
+ * クリック地点のそばを通らなかった（stopped でない）なら null
+ */
+export function reverseToSource(
+  down: { pts: LngLat[]; dist: number[]; stopped: boolean },
+  coarse: { pts: LngLat[]; dist: number[] },
+  tip: number,
+  start?: LngLat,
+): { pts: LngLat[]; dist: number[]; offset: number } | null {
+  if (!down.stopped) return null;
+  const total = down.dist[down.dist.length - 1];
+  const pts = [...down.pts].reverse();
+  const gap = start ? nearM(start, pts[0]) : 0;
+  const dist = down.dist.map((d) => gap + total - d).reverse();
+  if (start) {
+    pts.unshift(start);
+    dist.unshift(0);
+  }
+  const end = dist[dist.length - 1];
+  for (let i = tip + 1; i < coarse.pts.length; i++) {
+    pts.push(coarse.pts[i]);
+    dist.push(end + coarse.dist[i] - coarse.dist[tip]);
+  }
+  return { pts, dist, offset: start ? 1 : 0 };
 }
