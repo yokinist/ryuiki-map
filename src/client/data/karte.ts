@@ -91,25 +91,26 @@ function karteFile<T>(kind: Kind, m1: number): Promise<T[]> {
  */
 export function basinAt(from: { g: Grid; s: number }) {
   const [lon, lat] = from.g.lngLat(from.s);
-  const candidates: {
-    g: Grid;
-    s: number;
-    up: Uint8Array;
-    truncated: boolean;
-    km2: number;
-  }[] = [];
-  for (const g of [from.g, ...grids.wides]) {
-    const c = g === from.g ? from.s : g.toCell(lon, lat);
-    if (c < 0) continue;
-    const s =
-      g === from.g
-        ? c
-        : snap(g.acc, g.W, g.H, c, Math.max(1, Math.round(150 / g.cellM)));
-    const up = upstream(g.down, g.order, s);
-    const truncated = touchesEdge(g, up);
-    candidates.push({ g, s, up, truncated, km2: g.acc[s] * g.cellKm2 });
+  // 候補は pickBasin が必要とした分だけ数える（収まる範囲が見つかったら、残りのグリッドは数えない）
+  function* candidates() {
+    for (const g of [from.g, ...grids.wides]) {
+      const c = g === from.g ? from.s : g.toCell(lon, lat);
+      if (c < 0) continue;
+      const s =
+        g === from.g
+          ? c
+          : snap(g.acc, g.W, g.H, c, Math.max(1, Math.round(150 / g.cellM)));
+      const up = upstream(g.down, g.order, s);
+      yield {
+        g,
+        s,
+        up,
+        truncated: touchesEdge(g, up),
+        km2: g.acc[s] * g.cellKm2,
+      };
+    }
   }
-  return pickBasin(candidates);
+  return pickBasin(candidates());
 }
 
 /** グリッド g のセル s より上流の範囲の流域サマリ（降水量は別に precipitation で問い合わせる） */

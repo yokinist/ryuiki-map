@@ -20,14 +20,16 @@ const SAME_RIVER_SHARE = 0.5;
 /**
  * 候補の範囲から、集水域が収まる最初のものを選ぶ。最初の候補は雨をたどったグリッド、以降は吸着し直した別のグリッド。
  * 吸着し直しで別の小さな沢に乗った候補は除く。どれにも収まらなければ、集水域がいちばん広く数えられた候補
- * （いちばん遠くまでたどれる）を返す
+ * （いちばん遠くまでたどれる）を返す。
+ * 候補は1件ずつ受け取り、収まるものが見つかったら残りは数えない（候補ごとに集水域を数えるのは重い）
  */
 export function pickBasin<T extends { truncated: boolean; km2: number }>(
-  candidates: T[],
+  candidates: Iterable<T>,
 ): T | null {
-  const ref = candidates[0]?.km2 ?? 0;
+  let ref: number | undefined;
   let best: T | null = null;
   for (const c of candidates) {
+    ref ??= c.km2;
     if (c.km2 < ref * SAME_RIVER_SHARE) continue;
     if (!c.truncated) return c;
     if (!best || c.km2 > best.km2) best = c;

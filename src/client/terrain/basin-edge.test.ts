@@ -65,6 +65,23 @@ describe("pickBasin: 候補の範囲から、集水域が収まるものを選�
     ).toBe("広域A");
   });
 
+  it("収まる候補が見つかったら、残りの候補は数えない（候補ごとに集水域を数えるのは重いので）", () => {
+    function* candidates() {
+      yield c("細かい", true, 5);
+      yield c("広域A", false, 300);
+      throw new Error("収まる候補が見つかったあとに、次の候補を数えた");
+    }
+    expect(pickBasin(candidates())?.id).toBe("広域A");
+  });
+
+  it("候補を1件ずつ受け取るときも、最初の候補より集水域がずっと小さい候補は選ばない", () => {
+    function* candidates() {
+      yield c("広域", true, 4000);
+      yield c("細かい", false, 2);
+    }
+    expect(pickBasin(candidates())?.id).toBe("広域");
+  });
+
   it("候補がなければ null", () => {
     expect(pickBasin([])).toBeNull();
   });
