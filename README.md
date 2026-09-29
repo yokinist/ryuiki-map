@@ -192,7 +192,7 @@ public/                  静的ファイル（seas.json、_headers、地図の�
 site.config.ts           サイト名・説明・URL・構造化データ。index.html の {{キー}} に差し込む
 site.files.ts            robots.txt・sitemap.xml・llms.txt（AI 向けのサイト説明）。ビルド時に書き出す
 wrangler.jsonc           Cloudflare Workers の設定。静的アセットを配るだけで Worker のコードは持たない
-.github/                 CI（型チェック・Lint・テスト・ビルド）と Issue・PR のひな形
+.github/                 CI（型チェック・Lint・テスト・ビルド）、PR の自動レビュー、Issue・PR のひな形
 ```
 
 テストは対象ファイルの隣に `*.test.ts` として置く。
