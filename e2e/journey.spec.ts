@@ -17,10 +17,8 @@ test("河口に着く → 上流へさかのぼる（URL に dir=up）→ 下流
   // さかのぼっている間は共有が隠れ、水源に着くとまた出る
   await expect(page.locator("#share")).toBeHidden();
   await waitForArrival(page);
-  // 淀川の集水域（琵琶湖を含む）は計算範囲に収まらないので、今は「追いきれませんでした」（#1）。#3 で水源に届いたら書き換える
-  await expect(page.locator("#headline")).toHaveText(
-    "水源まで追いきれませんでした",
-  );
+  // 淀川の集水域（琵琶湖を含む）は広域グリッドに収まらないが、さかのぼり専用の粗い範囲を読んで水源（高時川の源流）に届く（#3）
+  await expect(page.locator("#headline")).toHaveText("水源にたどり着きました");
   expect(new URL(page.url()).searchParams.get("dir")).toBe("up");
 
   await page.getByRole("button", { name: "下流へくだる" }).click();
