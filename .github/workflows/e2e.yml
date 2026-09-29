@@ -1,17 +1,16 @@
 name: E2E
 
 # ブラウザで動かすテスト。国土地理院の標高タイルに依存する（落ちているとテストも落ちる）ので、
-# すべての PR では走らせず、計算・データ・画面に関わるファイルが変わった PR と、週1回・手動に絞る
+# すべての PR では走らせない。PR では ci.yml が、計算・データ・画面に関わるファイルが変わったときだけ
+# PR のプレビュー URL に対して呼ぶ（workflow_call）。ほかに週1回（本番のビルドと同じ手元ビルド）と手動
 on:
-  pull_request:
-    paths:
-      - "src/client/**"
-      - "public/rivers/**"
-      - "public/karte/**"
-      - "index.html"
-      - "e2e/**"
-      - "playwright.config.ts"
-      - ".github/workflows/e2e.yml"
+  workflow_call:
+    inputs:
+      base_url:
+        description: "対象の URL（空なら手元でビルドしたものに対して走る）"
+        type: string
+        required: false
+        default: ""
   schedule:
     - cron: "0 21 * * 0" # 月曜 6:00 JST
   workflow_dispatch:
@@ -38,7 +37,9 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm test:e2e
+      - run: |
+          echo "対象: ${BASE_URL:-手元のビルド}"
+          pnpm test:e2e
         env:
           BASE_URL: ${{ inputs.base_url }}
       - if: failure()
