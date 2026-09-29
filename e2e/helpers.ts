@@ -5,11 +5,14 @@ export async function waitForArrival(page: Page) {
   await expect(page.locator("#share")).toBeVisible();
 }
 
-/** 「24.0 km」「213.4 km上流」のような文字から距離 km を読む */
+/** 「24.0 km」「213.4 km上流」「820 m」のような文字から距離 km を読む（format.ts の km は 1km 未満を m で出す） */
 export function kmOf(text: string): number {
-  const m = text.match(/([\d,]+(?:\.\d+)?) km/);
+  // km を先に探す（「標高 1,999 m」のような別の値を拾わないように）。km がなければ m
+  const km = text.match(/([\d,]+(?:\.\d+)?) km/);
+  if (km) return Number(km[1].replace(/,/g, ""));
+  const m = text.match(/([\d,]+) m(?![a-z])/);
   if (!m) throw new Error(`距離が見つかりません: ${text}`);
-  return Number(m[1].replace(/,/g, ""));
+  return Number(m[1].replace(/,/g, "")) / 1000;
 }
 
 /** 距離が期待値の ±10% に入っているか（計算の細部で揺れるので幅を持たせる） */
