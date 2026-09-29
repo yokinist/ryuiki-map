@@ -1,4 +1,5 @@
-import { type BBox, latToY, lonToX, xToLon, yToLat } from "../geo";
+import { type BBox, latToY, lonToX } from "../geo";
+import type { TileRange } from "./grid-spec";
 
 /** 集水域が範囲のどの辺に届いているか（北 = y の小さい側） */
 export interface Touched {
@@ -37,13 +38,6 @@ export function basinExtent(
 /** 一度に読むタイルの上限（6×6 と同じ）と、1つの軸の上限（南北に長い集水域でも縦長で読めるように） */
 const WIDEST_MAX_TILES = 36;
 const MAX_PER_AXIS = 8;
-
-export interface TileRange {
-  tx0: number;
-  tx1: number;
-  ty0: number;
-  ty1: number;
-}
 
 /**
  * はみ出した集水域を読み直すタイルの範囲（ズーム z）。集水域の外接矩形を覆うタイルから、切れている辺の方向へだけ広げる。
@@ -86,16 +80,4 @@ export function widestTiles(
     ty1 += grow - north;
   }
   return { tx0, tx1, ty0, ty1 };
-}
-
-/** タイルの範囲を覆う bbox（隣のタイルにはみ出さないよう、ほんの少し内側） */
-export function tilesBBox(z: number, t: TileRange): BBox {
-  const n = 2 ** z;
-  const e = 1e-9;
-  return [
-    xToLon(t.tx0 / n) + e,
-    yToLat((t.ty1 + 1) / n) + e,
-    xToLon((t.tx1 + 1) / n) - e,
-    yToLat(t.ty0 / n) - e,
-  ];
 }
