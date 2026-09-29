@@ -6,5 +6,8 @@
   // OGP 画像のような動的なルートが要るときは main を足す
   "assets": {
     "not_found_handling": "single-page-application"
-  }
+  },
+  // PR ごとのプレビュー（wrangler versions upload --preview-alias）に pr-<番号>-ryuiki-map.<サブドメイン>.workers.dev を付ける。
+  // 本番に出すのは wrangler deploy だけで、プレビューの版は本番に出ない
+  "preview_urls": true
 }

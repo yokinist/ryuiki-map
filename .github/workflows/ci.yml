@@ -26,6 +26,60 @@ jobs:
       - run: pnpm test
       - run: pnpm build
 
+  # 同じリポジトリのブランチからの PR で、本番とは別の版を作ってプレビュー URL を PR にコメントする。
+  # フォークからの PR には Secrets が渡らないので飛ばす（pull_request_target は使わない。PR のコードに Secrets を渡すことになる）
+  preview:
+    needs: test
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    concurrency:
+      group: preview-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      # プレビューは検索に載せない（本番の public/_headers は変えず、プレビューのビルドにだけ足す）
+      - run: |
+          printf '\n# プレビューだけ（CI が足す）\n/*\n  X-Robots-Tag: noindex\n' >> dist/_headers
+      - id: upload
+        run: |
+          pnpm exec wrangler versions upload --preview-alias "pr-$PR" --message "PR #$PR ($SHA)" | tee upload.log
+          url=$(grep -oE "https://pr-$PR-[a-z0-9.-]+\.workers\.dev" upload.log | head -1)
+          test -n "$url"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+        env:
+          PR: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # コメントは増やさず、このジョブが書いた印（<!-- preview -->）付きの1つを書き換える。
+      # 書き手も絞る（人が同じ印で始まるコメントを書くと、それを書き換えようとして権限がなく落ちる）
+      - run: |
+          body=$(printf '<!-- preview -->\n**プレビュー**: %s\n\n%s 時点。push のたびに更新されます。本番（main）には影響しません。検索には載りません。\n' "$URL" "$SHA")
+          id=$(gh api "repos/$REPO/issues/$PR/comments" --paginate --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("<!-- preview -->"))) | .id' | head -1)
+          if [ -n "$id" ]; then
+            gh api --method PATCH "repos/$REPO/issues/comments/$id" -f body="$body" > /dev/null
+          else
+            gh api --method POST "repos/$REPO/issues/$PR/comments" -f body="$body" > /dev/null
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          URL: ${{ steps.upload.outputs.url }}
+
   # main への push で、CI が通ったら Cloudflare Workers へ公開する（PR では公開しない）
   deploy:
     needs: test
