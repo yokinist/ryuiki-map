@@ -3,6 +3,7 @@ import type { LngLat } from "../geo";
 import type { SourcePath } from "../ui/timeline";
 import { type Grid, gridAround, loadWide } from "./grid";
 import { farthestStem, mainStem, snap, tributaries } from "./hydro";
+import { isSourceCut } from "./source-cut";
 
 /** 雨粒がたどる流路。dist[i] は pts[i] までの流路長 m、rivers[].step は pts の添字 */
 export interface Path {
@@ -92,8 +93,15 @@ export async function traceToSea(
 const MIN_TRIBUTARY_KM2 = 5;
 const MIN_TRIBUTARY_SHARE = 0.1;
 
-/** s から、支流の先の先までたどっていちばん遠い水源へさかのぼる（g の中だけ。端に着いたら cut） */
-export function traceToSource(g: Grid, s: number): SourcePath {
+/**
+ * s から、支流の先の先までたどっていちばん遠い水源へさかのぼる（g の中だけ）。
+ * truncated: s の集水域が g からはみ出している（端に着いたときと同じく cut）
+ */
+export function traceToSource(
+  g: Grid,
+  s: number,
+  truncated = false,
+): SourcePath {
   const cells = farthestStem(g.down, g.order, g.W, s);
   const dist = [0];
   for (let i = 1; i < cells.length; i++)
@@ -121,14 +129,12 @@ export function traceToSource(g: Grid, s: number): SourcePath {
     named.push({ name, step: t.step });
   }
   const last = cells[cells.length - 1];
-  const x = last % g.W;
-  const y = (last / g.W) | 0;
   return {
     pts: cells.map((c) => g.lngLat(c)),
     dist,
     rivers,
     tributaries: named,
     elev: g.elev[last],
-    cut: x === 0 || y === 0 || x === g.W - 1 || y === g.H - 1,
+    cut: isSourceCut(g, last, truncated),
   };
 }
