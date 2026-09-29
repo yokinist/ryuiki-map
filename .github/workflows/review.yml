@@ -16,8 +16,10 @@ permissions:
   pull-requests: write
   id-token: write
 
+# 同じ PR に push が続いたら古いレビューを止める。レビュー自身の書き込みなど、起動しないコメントは
+# 別のグループにする（同じグループだと、走っているレビューが取り消され、インラインの指摘が投稿されない）
 concurrency:
-  group: review-${{ github.event.pull_request.number || github.event.issue.number }}
+  group: review-${{ github.event.pull_request.number || github.event.issue.number }}-${{ github.event_name == 'issue_comment' && !contains(github.event.comment.body, '@claude review') && github.run_id || 'review' }}
   cancel-in-progress: true
 
 jobs:
