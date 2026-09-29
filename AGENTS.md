@@ -8,7 +8,7 @@
 
 ## 公開
 
-`main` はブランチ保護で PR 経由のマージだけを受け付ける（Rebase か Squash。マージコミット不可。必須チェックは `ci.yml` の `test` で、ブランチが最新の `main` に追いついている必要がある）。作業は `main` から切ったブランチで行い、PR を出す。PR のタイトルは Conventional Commits にそろえる（Squash ではコミットの題名になる）。Rebase で入れる PR は、各コミットの題名もそろえる。
+`main` はブランチ保護で PR 経由のマージを求める（マージコミット不可。必須チェックは `ci.yml` の `test` で、ブランチが最新の `main` に追いついている必要がある。管理者は迂回でき、細かい修正は指示があれば `main` に直接 push する）。作業は `main` から切ったブランチで行い、PR を出す。マージは Rebase が基本なので、各コミットを1つの変更にまとめ、題名を Conventional Commits にそろえる。履歴が整わなかった PR だけ例外的に Squash にするので、PR のタイトルもそろえる。
 
 `main` にマージされると、GitHub Actions が CI（型チェック・Lint・テスト・ビルド）のあとに Cloudflare Workers へデプロイする（`.github/workflows/ci.yml`）。手元の `pnpm deploy` は、Actions を待たずに出したいときだけ使う。同じリポジトリのブランチからの PR では、本番とは別の版をプレビュー（`pr-<番号>-ryuiki-map.ykns.workers.dev`）として出し、URL を PR にコメントする（フォークからの PR では出ない）。
 
