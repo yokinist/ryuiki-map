@@ -63,10 +63,11 @@ jobs:
           SHA: ${{ github.event.pull_request.head.sha }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      # コメントは増やさず、印（<!-- preview -->）の付いた1つを書き換える
+      # コメントは増やさず、このジョブが書いた印（<!-- preview -->）付きの1つを書き換える。
+      # 書き手も絞る（人が同じ印で始まるコメントを書くと、それを書き換えようとして権限がなく落ちる）
       - run: |
           body=$(printf '<!-- preview -->\n**プレビュー**: %s\n\n%s 時点。push のたびに更新されます。本番（main）には影響しません。検索には載りません。\n' "$URL" "$SHA")
-          id=$(gh api "repos/$REPO/issues/$PR/comments" --paginate --jq '.[] | select(.body | startswith("<!-- preview -->")) | .id' | head -1)
+          id=$(gh api "repos/$REPO/issues/$PR/comments" --paginate --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("<!-- preview -->"))) | .id' | head -1)
           if [ -n "$id" ]; then
             gh api --method PATCH "repos/$REPO/issues/comments/$id" -f body="$body" > /dev/null
           else
