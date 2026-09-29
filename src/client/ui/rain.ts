@@ -671,6 +671,7 @@ export class Rain {
    * 高低差の小さい平地では、用水が地形からたどれないことを添える
    */
   private showSourceNote(basin: { g: Grid; s: number }, src: SourcePath) {
+    // 小さいかどうかの目安なので、範囲の中央の緯度の面積で足りる（流域サマリの面積はセルごとの緯度で測る）
     const km2 = basin.g.acc[basin.s] * basin.g.cellKm2;
     const small = km2 < SMALL_BASIN_KM2;
     const flat = src.elev - basin.g.elev[basin.s] < FLAT_RELIEF_M;

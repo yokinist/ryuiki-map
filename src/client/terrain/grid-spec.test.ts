@@ -65,3 +65,20 @@ describe("bboxAround", () => {
       }
     });
 });
+
+describe("rowM: 緯度ごとのセルの大きさ", () => {
+  // 北緯30〜45度にまたがる広い範囲（ズーム9）。Web メルカトルのセルは、緯度 φ で赤道の cos φ 倍になる
+  const w = gridSpec([130, 30, 131, 45], 9);
+  const rowAt = (lat: number) => Math.floor(w.toPixel(130.5, lat)[1]);
+
+  it("北緯45度の行は、北緯30度の行の cos45°/cos30° 倍（約0.82倍）になる", () => {
+    const ratio = w.rowM(rowAt(45)) / w.rowM(rowAt(30));
+    expect(ratio).toBeCloseTo(Math.cos(Math.PI / 4) / Math.cos(Math.PI / 6), 2);
+  });
+
+  it("赤道の1セルは、地球の周長をズームの全ピクセル数で割った長さ", () => {
+    const eq = gridSpec([0, -0.1, 0.1, 0.1], 9);
+    const y = Math.floor(eq.toPixel(0.05, 0)[1]);
+    expect(eq.rowM(y)).toBeCloseTo(40075016.686 / (256 * 2 ** 9), 0);
+  });
+});

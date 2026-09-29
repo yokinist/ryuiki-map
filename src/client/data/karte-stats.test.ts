@@ -102,6 +102,16 @@ describe("longestFlowKm", () => {
     const up = new Uint8Array([1, 1]);
     expect(longestFlowKm(down, order, up, W, 50, 1)).toBeCloseTo(0.05);
   });
+
+  it("行ごとのセルの大きさを渡すと、2つの行の平均で測る（南北に長い範囲で緯度の違いを反映する）", () => {
+    // 1x3 の縦。0→1→2（出口）。行 0〜2 のセルの大きさが 80・90・100 m
+    const down = new Int32Array([1, 2, -1]);
+    const order = new Int32Array([2, 1, 0]);
+    const up = new Uint8Array([1, 1, 1]);
+    expect(
+      longestFlowKm(down, order, up, 1, (y) => 80 + 10 * y, 2),
+    ).toBeCloseTo((85 + 95) / 1000);
+  });
 });
 
 describe("pathMeshWeights", () => {

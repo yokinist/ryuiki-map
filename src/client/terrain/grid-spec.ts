@@ -10,9 +10,11 @@ export interface GridSpec {
   ty1: number;
   W: number;
   H: number;
-  /** セル1辺の長さ m */
+  /** セル1辺の長さ m（範囲の中央の緯度での値。目安や閾値に使う） */
   cellM: number;
   cellKm2: number;
+  /** 行 y のセル1辺の長さ m。Web メルカトルのセルは緯度 φ で赤道の cos φ 倍になるので、距離や面積はこちらで測る */
+  rowM: (y: number) => number;
   /** グリッド左上から (x, y) ピクセルの位置（セルの角）の経緯度 */
   at: (x: number, y: number) => LngLat;
   bbox: BBox;
@@ -80,10 +82,9 @@ export function gridSpec(bbox: BBox, z?: number): GridSpec {
     const Y0 = ty0 * 256;
     const W = (tx1 - tx0 + 1) * 256;
     const H = (ty1 - ty0 + 1) * 256;
-    // ponytail: セル寸法は範囲中央の緯度で固定。広域では南北で数%ずれる
-    const cellM =
-      (40075016.686 * Math.cos((((bbox[1] + bbox[3]) / 2) * Math.PI) / 180)) /
-      N2;
+    const atLat = (lat: number) =>
+      (40075016.686 * Math.cos((lat * Math.PI) / 180)) / N2;
+    const cellM = atLat((bbox[1] + bbox[3]) / 2);
     const ll = (x: number, y: number): LngLat => [x2lon(x), y2lat(y)];
     return {
       Z,
@@ -95,6 +96,7 @@ export function gridSpec(bbox: BBox, z?: number): GridSpec {
       H,
       cellM,
       cellKm2: (cellM * cellM) / 1e6,
+      rowM: (y) => atLat(y2lat(Y0 + y + 0.5)),
       at: (x, y) => ll(X0 + x, Y0 + y),
       bbox: [x2lon(X0), y2lat(Y0 + H), x2lon(X0 + W), y2lat(Y0)],
       toCell: (lon, lat) => {

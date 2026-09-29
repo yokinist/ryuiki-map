@@ -105,6 +105,7 @@ function basinIn(g: Grid, from: { g: Grid; s: number }): BasinCandidate | null {
       ? c
       : snap(g.acc, g.W, g.H, c, Math.max(1, Math.round(150 / g.cellM)));
   const up = upstream(g.down, g.order, s);
+  // 候補を比べる目安なので、範囲の中央の緯度の面積で数える（サマリに出す面積はセルごとの緯度で測る）
   return { g, s, up, truncated: touchesEdge(g, up), km2: g.acc[s] * g.cellKm2 };
 }
 
@@ -219,6 +220,7 @@ export async function karteAt(from: {
   if (!basin) return null;
   const { g, s, up, truncated } = basin;
   let cells = 0;
+  let area = 0;
   let min = Infinity;
   let max = -Infinity;
   let sum = 0;
@@ -239,7 +241,9 @@ export async function karteAt(from: {
     cy += y;
     const { m1, sub } = meshOf(x, y);
     const key = m1 * 10000 + sub;
-    inMesh.set(key, (inMesh.get(key) ?? 0) + g.cellKm2);
+    const km2 = g.rowM((c / g.W) | 0) ** 2 / 1e6; // 緯度でセルの面積が変わる
+    area += km2;
+    inMesh.set(key, (inMesh.get(key) ?? 0) + km2);
     if (g.label[c] >= 0) {
       const name = g.rivers[g.label[c]].name;
       rivers.set(name, (rivers.get(name) ?? 0) + 1);
@@ -272,8 +276,8 @@ export async function karteAt(from: {
 
   return {
     outlet: from.g.lngLat(from.s),
-    areaKm2: cells * g.cellKm2,
-    lengthKm: longestFlowKm(g.down, g.order, up, g.W, g.cellM, s),
+    areaKm2: area,
+    lengthKm: longestFlowKm(g.down, g.order, up, g.W, g.rowM, s),
     truncated,
     elev: { min, mean: sum / cells, max },
     rivers: [...rivers].sort((a, b) => b[1] - a[1]).map(([n]) => n),
