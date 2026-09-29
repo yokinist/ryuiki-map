@@ -486,8 +486,12 @@ export class Rain {
   }
 
   /** クリック地点の集水域を地図に塗る（数値は流域サマリで見る） */
-  private showBasin(g: Grid, s: number, alive: () => boolean) {
-    const up = upstream(g.down, g.order, s);
+  private showBasin(
+    g: Grid,
+    s: number,
+    alive: () => boolean,
+    up = upstream(g.down, g.order, s),
+  ) {
     const fill = pixel("--color-basin", 0xa8);
     const rect = maskRect(g, up);
     if (rect)
@@ -579,6 +583,8 @@ export class Rain {
     if (up) up.disabled = false;
     // 待つ間に「雨の通り道」を開き直して下り直していたら、さかのぼりで割り込まない
     if (!alive() || !basin || this.showing !== "source") return;
+    // クリック時の塗りは雨をたどった範囲の中だけなので、より広い範囲で数え直せたら塗り直す
+    if (basin.g !== from.g) this.showBasin(basin.g, basin.s, alive, basin.up);
     const src = traceToSource(basin.g, basin.s, basin.truncated);
     const n = src.pts.length;
     this.ui.route.open = false; // 下る旅はたたみ、さかのぼる道のりに目を移す
