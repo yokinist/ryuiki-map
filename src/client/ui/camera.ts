@@ -38,6 +38,11 @@ export class FollowCamera {
   private raf = 0;
   private last = 0;
   private stopped = false;
+  private land: () => void = () => {};
+  /** 着地し終えた（または止められた）ら解決する。重い処理は、これを待ってから始めると動きを止めない */
+  readonly landed = new Promise<void>((resolve) => {
+    this.land = resolve;
+  });
   private readonly reduce = reducedMotion();
   private readonly panMs = Math.max(tokenMs("--duration-slow"), 1);
   private readonly zoomMs = Math.max(tokenMs("--duration-camera"), 1);
@@ -90,6 +95,7 @@ export class FollowCamera {
 
   dispose() {
     this.stopped = true;
+    this.land();
     cancelAnimationFrame(this.raf);
     this.map.off("movestart", this.onMoveStart);
     this.panel.removeEventListener("toggle", this.onToggle, true);
@@ -132,6 +138,7 @@ export class FollowCamera {
     // 追いかけている間は毎フレーム動かし続ける（1フレームでも止めると、次で2倍進んでカクつく）
     if (!this.arrived || !this.settled(goal))
       this.raf = requestAnimationFrame(this.tick);
+    else this.land();
   };
 
   /** 今の最終目標。動きを減らす設定なら、最初から旅の全体 */

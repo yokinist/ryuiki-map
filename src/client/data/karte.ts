@@ -1,7 +1,9 @@
 // 流域サマリ: ある地点より上流の範囲（集水域）について、面積・標高・土地の使われ方・人口・ダム・降水量をまとめる
-import { SOURCES } from "../config";
+import { SOURCES, WIDEST } from "../config";
 import type { LngLat } from "../geo";
 import { pickBasin, touchesEdge } from "../terrain/basin-edge";
+import { basinExtent, widestTiles } from "../terrain/basin-range";
+import { widenBasin } from "../terrain/basin-widen";
 import { type Grid, grids, loadWidest } from "../terrain/grid";
 import { snap, upstream } from "../terrain/hydro";
 import {
@@ -122,20 +124,90 @@ export function basinLoaded(from: { g: Grid; s: number }) {
   return pickBasin(candidates());
 }
 
+/** はみ出した集水域を読み直す粗い範囲。集水域の外接矩形から、切れている辺の方向へ広げたタイルの範囲 */
+const widestRangeFor = (c: BasinCandidate) => {
+  const { bbox, touched } = basinExtent(c.g, c.up);
+  return widestTiles(WIDEST.z, bbox, touched);
+};
+
+/**
+ * 海に着いて着地の動きが終わったら呼ぶ（rain.ts）。集水域が読み込み済みのグリッドに収まらないなら、さかのぼり専用の粗い範囲を裏で読み始める。
+ * 「上流へさかのぼる」を押されたときには読み終わっているように。収まる川（大半）では何も読まない
+ */
+export function prefetchBasin(from: { g: Grid; s: number }) {
+  // どの地点でも問い合わせる（収まる川ならすぐ終わる）。前の地点の先読みは、これで読み直しを打ち切る。
+  // 失敗しても何もしない（読めなかった・打ち切った結果は覚えないので、押されたときに basinAt が読み直す）
+  basinAt(from).catch(() => {});
+}
+
 /**
  * 雨の流れをたどった地点より上流の範囲。読み込み済みのグリッドのどれにも収まらなければ、
- * さかのぼり専用の粗い範囲（約360km四方）を読んで数え直す。それにも収まらなければ truncated のまま返す
+ * さかのぼり専用の粗い範囲（集水域に合わせた形、最大36枚）を読んで数え直す。それにも収まらなければ truncated のまま返す。
+ * 同じ地点への問い合わせ（先読み・「上流へさかのぼる」・流域サマリ）は、1つの結果を使い回す（読み直さない・結果がぶれない）
  */
-export async function basinAt(
+export function basinAt(
   from: { g: Grid; s: number },
   say?: (text: string) => void,
 ) {
+  const key = from.g.lngLat(from.s).join(",");
+  // 進み具合は、いま待っている呼び出し元に出す（先読みの結果を使い回しても、押した側に表示が届くように）
+  if (lastBasin?.key === key) {
+    if (say) lastBasin.say = say;
+    return lastBasin.promise;
+  }
+  const entry: NonNullable<typeof lastBasin> = {
+    key,
+    say,
+    promise: Promise.resolve(null),
+  };
+  lastBasin = entry;
+  // 読めなかった・途中で打ち切った結果は、次に聞かれたときに読み直せるよう覚えない。
+  // 最後まで試して切れたままの結果は、読み直しても同じなので覚えておく（押したとき・サマリで待たせない）
+  const forget = () => {
+    if (lastBasin === entry) lastBasin = null;
+  };
+  entry.promise = findBasin(
+    from,
+    (text) => entry.say?.(text),
+    () => lastBasin === entry,
+  ).then(
+    (r) => {
+      if (!r.complete) forget();
+      return r.basin;
+    },
+    (e) => {
+      forget();
+      throw e;
+    },
+  );
+  return entry.promise;
+}
+let lastBasin: {
+  key: string;
+  say?: (text: string) => void;
+  promise: Promise<BasinCandidate | null>;
+} | null = null;
+
+/** 読み込み済みの範囲で数え、切れていれば、さかのぼり専用の粗い範囲を広げて読み直す（terrain/basin-widen.ts） */
+async function findBasin(
+  from: { g: Grid; s: number },
+  say: (text: string) => void,
+  current: () => boolean,
+): Promise<{ basin: BasinCandidate | null; complete: boolean }> {
   const loaded = basinLoaded(from);
-  if (loaded && !loaded.truncated) return loaded;
-  // 読めなければ（通信の失敗など）、読み込み済みの範囲の結果（切れている）で続ける。止めて待たせない
-  const widest = await loadWidest(from.g.lngLat(from.s), say).catch(() => null);
-  const wide = widest && basinIn(widest, from);
-  return pickBasin([loaded, wide].filter((c): c is BasinCandidate => !!c));
+  if (!loaded?.truncated) return { basin: loaded, complete: true };
+  return widenBasin(loaded, {
+    current,
+    // 読めなければ（通信の失敗など）、そこまでの結果（切れている）で続ける。止めて待たせない
+    load: async (best) => {
+      const widest = await loadWidest(widestRangeFor(best), say).catch(
+        () => null,
+      );
+      if (!widest) return null;
+      // 吸着し直しで別の小さな沢に乗った候補は選ばない（増えないので、そこで止まる）
+      return pickBasin([loaded, basinIn(widest, from)].filter((c) => !!c));
+    },
+  });
 }
 
 /** グリッド g のセル s より上流の範囲の流域サマリ（降水量は別に precipitation で問い合わせる） */
