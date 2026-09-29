@@ -4,7 +4,7 @@
 
 ## 仕上げ
 
-変更を終えたら `pnpm typecheck && pnpm check && pnpm test` を通す。`index.html`・`vite.config.ts`・`site.*.ts`・`wrangler.jsonc` を触ったら `pnpm build` も（CI は4つとも走らせる）。
+変更を終えたら `pnpm typecheck && pnpm check && pnpm test` を通す。`index.html`・`vite.config.ts`・`site.*.ts`・`wrangler.jsonc` を触ったら `pnpm build` も（CI は4つとも走らせる）。計算（`terrain/`・`data/`）・データ（`public/rivers/`・`public/karte/`）・画面の流れを触ったら `pnpm test:e2e`（ブラウザで代表地点の結果を確かめる。数分かかる。CI ではそれらが変わった PR でだけ走る）。
 
 ## 公開
 

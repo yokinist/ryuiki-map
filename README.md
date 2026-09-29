@@ -34,6 +34,7 @@ pnpm build:karte        # 流域サマリ用の人口・土地・ダムのデー
 | --- | --- |
 | `pnpm test` | ユニットテスト（Vitest） |
 | `pnpm typecheck` | 型チェック |
+| `pnpm test:e2e` | ブラウザ（Playwright・Chromium）で代表地点の結果と上り下りの切り替えを確かめる。国土地理院から標高タイルを取るので数分かかる。初回は `pnpm exec playwright install chromium`。`BASE_URL=https://…` を付けると本番や PR のプレビューに対して走る |
 | `pnpm check` / `pnpm format` | Lint・整形（Biome） |
 | `pnpm build:rivers [タイル…\|--pack]` | 河川データの取得と配信用タイルへの変換。引数なしなら全国のうち未取得の1°タイルだけ取る（途中から再開できる）。`139_36` のように指定するとそれだけ取り直す。どちらも変換は取得済みの全タイルで行う。`--pack` は取得せず変換だけやり直す |
 | `pnpm build:karte [1次メッシュ…\|--pack]` | 流域サマリ用のデータ。e-Stat の国勢調査1kmメッシュ（2010・2015・2020年の人口）、ESA WorldCover（土地の使われ方）、OSM のダム・堰を取得し、1次メッシュ（約80km四方）ごとのファイルにまとめる。途中から再開できる。`5339` のように指定するとそれだけ取る。どちらもまとめは取得済みの全メッシュで行う。`--pack` は取得せずまとめ直す |
