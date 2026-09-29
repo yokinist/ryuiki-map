@@ -1,6 +1,7 @@
 // 流域サマリ: ある地点より上流の範囲（集水域）について、面積・標高・土地の使われ方・人口・ダム・降水量をまとめる
 import { SOURCES } from "../config";
 import type { LngLat } from "../geo";
+import { pickBasin, touchesEdge } from "../terrain/basin-edge";
 import { type Grid, grids } from "../terrain/grid";
 import { snap, upstream } from "../terrain/hydro";
 import {
@@ -83,35 +84,33 @@ function karteFile<T>(kind: Kind, m1: number): Promise<T[]> {
   return file as Promise<T[]>;
 }
 
-/** 範囲が計算グリッドの端に届いているか */
-function touchesEdge(g: Grid, up: Uint8Array) {
-  const { W, H } = g;
-  for (let x = 0; x < W; x++) if (up[x] || up[(H - 1) * W + x]) return true;
-  for (let y = 0; y < H; y++) if (up[y * W] || up[y * W + W - 1]) return true;
-  return false;
-}
-
 /**
  * 雨の流れをたどった地点より上流の範囲。まず雨をたどったときのグリッドで数え、端に届いてしまうなら広域グリッド（約190km四方）で数え直す。
- * 広域では約150mの範囲だけ吸着させ直す（近くの大きな川に跳ばないように）
+ * 広域では約150mの範囲だけ吸着させ直す（近くの大きな川に跳ばないように）。
+ * truncated: 集水域が端に届いている（面積は実際より小さく、いちばん遠い水源も範囲の外にありうる）
  */
 export function basinAt(from: { g: Grid; s: number }) {
   const [lon, lat] = from.g.lngLat(from.s);
-  let best: { g: Grid; s: number; up: Uint8Array; truncated: boolean } | null =
-    null;
-  for (const g of [from.g, ...grids.wides]) {
-    const c = g === from.g ? from.s : g.toCell(lon, lat);
-    if (c < 0) continue;
-    const s =
-      g === from.g
-        ? c
-        : snap(g.acc, g.W, g.H, c, Math.max(1, Math.round(150 / g.cellM)));
-    const up = upstream(g.down, g.order, s);
-    const truncated = touchesEdge(g, up);
-    if (!truncated) return { g, s, up, truncated };
-    best ??= { g, s, up, truncated };
+  // 候補は pickBasin が必要とした分だけ数える（収まる範囲が見つかったら、残りのグリッドは数えない）
+  function* candidates() {
+    for (const g of [from.g, ...grids.wides]) {
+      const c = g === from.g ? from.s : g.toCell(lon, lat);
+      if (c < 0) continue;
+      const s =
+        g === from.g
+          ? c
+          : snap(g.acc, g.W, g.H, c, Math.max(1, Math.round(150 / g.cellM)));
+      const up = upstream(g.down, g.order, s);
+      yield {
+        g,
+        s,
+        up,
+        truncated: touchesEdge(g, up),
+        km2: g.acc[s] * g.cellKm2,
+      };
+    }
   }
-  return best;
+  return pickBasin(candidates());
 }
 
 /** グリッド g のセル s より上流の範囲の流域サマリ（降水量は別に precipitation で問い合わせる） */

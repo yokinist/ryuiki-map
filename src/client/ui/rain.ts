@@ -555,7 +555,7 @@ export class Rain {
     if (!basin) return;
     const run = ++this.sourceRun;
     const alive = () => playing() && run === this.sourceRun;
-    const src = traceToSource(basin.g, basin.s);
+    const src = traceToSource(basin.g, basin.s, basin.truncated);
     const n = src.pts.length;
     this.ui.route.open = false; // 下る旅はたたみ、さかのぼる道のりに目を移す
     this.ui.source.hidden = false;
