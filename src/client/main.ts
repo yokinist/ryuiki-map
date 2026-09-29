@@ -356,14 +356,9 @@ async function onClick(p: LngLat, up = false) {
       map.getZoom() >= CLICK_ZOOM
         ? Promise.resolve()
         : new Promise<void>((resolve) => {
-            // padding を easeTo に渡すと地図に残り続け、以後の cameraForBounds で二重に効いて
-            // 追いかけカメラの目標が飛ぶ。パネルを避けた中心はここで計算して渡す
-            const to = map.cameraForBounds([p, p], {
-              padding: paddingAround(map, $("panel")),
-              maxZoom: CLICK_ZOOM,
-            });
             map.easeTo({
-              center: to?.center ?? p,
+              center: p,
+              padding: paddingAround(map, $("panel")),
               zoom: CLICK_ZOOM,
               duration: reducedMotion() ? 0 : 1600,
             });

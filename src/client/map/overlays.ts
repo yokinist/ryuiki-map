@@ -51,7 +51,7 @@ export function addOverlays(map: MlMap) {
   }).toDataURL();
   const water = token("--color-water");
   const waterStrong = token("--color-water-strong");
-  const drop = token("--color-drop");
+  const drop = "#e03131";
   const halo = token("--color-map-halo");
   const big: ExpressionSpecification = [">=", ["get", "km"], BIG_RIVER_KM];
 
