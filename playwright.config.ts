@@ -2,8 +2,9 @@ import { defineConfig } from "@playwright/test";
 
 // ブラウザで動かす E2E。流れの計算は Web Worker・OffscreenCanvas・国土地理院の標高タイルに依存するので、
 // Vitest（Node）では動かせない分をここで守る。テストは e2e/ に置く（vitest は src/**/*.test.ts だけを見る）。
-// BASE_URL を渡すと、手元のビルドではなくその URL（本番・PR のプレビュー）に対して走る
-const baseURL = process.env.BASE_URL ?? "http://localhost:4173";
+// BASE_URL を渡すと、手元のビルドではなくその URL（本番・PR のプレビュー）に対して走る。
+// CI の workflow_dispatch の入力は未指定だと空文字で届くので、空も「渡していない」と見なす
+const baseURL = process.env.BASE_URL || "http://localhost:4173";
 
 export default defineConfig({
   testDir: "e2e",
