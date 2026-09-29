@@ -1,4 +1,4 @@
-import { WIDE } from "../config";
+import { WIDE, WIDEST } from "../config";
 import type { RiverProps } from "../data/rivers";
 import type { BBox, LngLat } from "../geo";
 import type { BuildDone, BuildMessage, BuildRequest } from "./grid.worker";
@@ -76,9 +76,15 @@ export async function buildGrid(
 }
 
 // ---- 読み込み済みのグリッド ----
-export const grids: { local: Grid | null; wides: Grid[] } = {
+export const grids: {
+  local: Grid | null;
+  wides: Grid[];
+  /** さかのぼり専用の粗い範囲（WIDEST）。wides に入れると下りの乗り換えで粗い範囲が選ばれるので別に持つ */
+  widest: Grid | null;
+} = {
   local: null,
   wides: [],
+  widest: null,
 };
 
 const all = () =>
@@ -117,4 +123,28 @@ export async function loadWide(p: LngLat, say?: (text: string) => void) {
 export function addWide(g: Grid) {
   grids.wides.push(g);
   if (grids.wides.length > WIDE.keep) grids.wides.shift();
+}
+
+/**
+ * p を中心にした、さかのぼり専用の粗い範囲。同じ中心で読み込み済み・読み込み中ならそれを使う
+ * （流域サマリと「上流へさかのぼる」が重なっても二重に読まない）。別の地点を中心に読んだ範囲は使い回さない。
+ * 集水域が収まるかは中心の位置で変わるので、使い回すと同じ地点でも直前の操作しだいで結果が変わってしまう
+ */
+let widestKey = "";
+let widestLoading: { key: string; promise: Promise<Grid> } | null = null;
+export function loadWidest(p: LngLat, say?: (text: string) => void) {
+  const key = p.map((v) => v.toFixed(5)).join(",");
+  if (grids.widest && widestKey === key) return Promise.resolve(grids.widest);
+  if (widestLoading?.key === key) return widestLoading.promise;
+  const promise = buildAround(p, WIDEST.z, WIDEST.tiles, say).then((g) => {
+    grids.widest = g;
+    widestKey = key;
+    return g;
+  });
+  widestLoading = { key, promise };
+  const done = () => {
+    if (widestLoading?.promise === promise) widestLoading = null;
+  };
+  promise.then(done, done); // 失敗は呼び出し元（basinAt）で扱う
+  return promise;
 }

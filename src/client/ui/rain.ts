@@ -546,15 +546,28 @@ export class Rain {
    * クリック地点から、支流の先の先までたどっていちばん遠い水源へさかのぼる。道のりの線をクリック地点から上流へ伸ばし、
    * 通る川・流れ込む支流・地区を「水の来た道」に並べる。河口に着いてから呼ぶ（同じ再生の alive を使う）
    */
-  private playSource(
+  private async playSource(
     from: { g: Grid; s: number },
     originPlace: Promise<Place | null>,
     playing: () => boolean,
   ) {
-    const basin = basinAt(from);
-    if (!basin) return;
     const run = ++this.sourceRun;
     const alive = () => playing() && run === this.sourceRun;
+    // 大きな川では、さかのぼり専用の粗い範囲を読んでから始める（読み込み中は見出しに出す）。
+    // 読み込みを待つ間に河口の地名が届いても見出しを書き戻さないよう、先に「水の来た道」を見ている状態にする
+    this.showing = "source";
+    this.startJourney("水源へさかのぼっています");
+    this.ui.progress.textContent = "上流の地形を読み込み中…";
+    // 待っている間は押せないようにする（押し直すたびに読み込み中の表示に戻らないように）。
+    // 戻すのは始めたときのボタン（待つ間に別の地点を選ぶと、this.upButton は新しいボタンを指す）
+    const up = this.upButton;
+    if (up) up.disabled = true;
+    const basin = await basinAt(from, (text) => {
+      if (alive()) this.ui.progress.textContent = text;
+    });
+    if (up) up.disabled = false;
+    // 待つ間に「雨の通り道」を開き直して下り直していたら、さかのぼりで割り込まない
+    if (!alive() || !basin || this.showing !== "source") return;
     const src = traceToSource(basin.g, basin.s, basin.truncated);
     const n = src.pts.length;
     this.ui.route.open = false; // 下る旅はたたみ、さかのぼる道のりに目を移す
