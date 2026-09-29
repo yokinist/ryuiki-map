@@ -1,0 +1,50 @@
+name: E2E
+
+# ブラウザで動かすテスト。国土地理院の標高タイルに依存する（落ちているとテストも落ちる）ので、
+# すべての PR では走らせない。PR では ci.yml が、計算・データ・画面に関わるファイルが変わったときだけ
+# PR のプレビュー URL に対して呼ぶ（workflow_call）。ほかに週1回（本番のビルドと同じ手元ビルド）と手動
+on:
+  workflow_call:
+    inputs:
+      base_url:
+        description: "対象の URL（空なら手元でビルドしたものに対して走る）"
+        type: string
+        required: false
+        default: ""
+  schedule:
+    - cron: "0 21 * * 0" # 月曜 6:00 JST
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "対象の URL（空なら手元でビルドしたものに対して走る）。本番や PR のプレビューを指定できる"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: |
+          echo "対象: ${BASE_URL:-手元のビルド}"
+          pnpm test:e2e
+        env:
+          BASE_URL: ${{ inputs.base_url }}
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: test-results/
+          retention-days: 7

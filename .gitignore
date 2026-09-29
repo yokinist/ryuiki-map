@@ -1,6 +1,10 @@
 # prod
 dist/
 
+# Playwright（E2E）の出力
+test-results/
+playwright-report/
+
 # caches
 *.tsbuildinfo
 .vite/

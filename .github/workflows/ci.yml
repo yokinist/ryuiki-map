@@ -35,6 +35,8 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+    outputs:
+      url: ${{ steps.upload.outputs.url }}
     concurrency:
       group: preview-${{ github.event.pull_request.number }}
       cancel-in-progress: true
@@ -79,6 +81,36 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
           SHA: ${{ github.event.pull_request.head.sha }}
           URL: ${{ steps.upload.outputs.url }}
+
+  # 計算・データ・画面に関わるファイルが変わった PR か（E2E を走らせるか）
+  changes:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      e2e: ${{ steps.diff.outputs.e2e }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: diff
+        run: |
+          if git diff --name-only "$BASE" "$HEAD" | grep -qE '^(src/client/|public/rivers/|public/karte/|e2e/|index\.html$|playwright\.config\.ts$|package\.json$|pnpm-lock\.yaml$|vite\.config\.ts$|\.github/workflows/(ci|e2e)\.yml$)'; then
+            echo "e2e=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "e2e=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+
+  # 上のファイルが変わった PR で、プレビュー URL に対してブラウザのテスト（e2e.yml）を走らせる。
+  # 国土地理院に依存するので毎回は走らせない。フォークからの PR ではプレビューがないので、手元ビルドに対して走る
+  e2e:
+    needs: [test, preview, changes]
+    if: ${{ !cancelled() && needs.test.result == 'success' && needs.changes.outputs.e2e == 'true' }}
+    uses: ./.github/workflows/e2e.yml
+    with:
+      base_url: ${{ needs.preview.outputs.url }}
 
   # main への push で、CI が通ったら Cloudflare Workers へ公開する（PR では公開しない）
   deploy:

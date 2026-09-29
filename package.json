@@ -16,6 +16,7 @@
     "deploy": "pnpm run build && wrangler deploy",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
     "check": "biome check .",
     "format": "biome format --write .",
@@ -31,6 +32,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.5.10",
     "@cloudflare/vite-plugin": "^1.44.0",
+    "@playwright/test": "1.63.0",
     "@resvg/resvg-js": "^2.6.2",
     "@types/geojson": "^7946.0.16",
     "@types/node": "^24.0.0",
