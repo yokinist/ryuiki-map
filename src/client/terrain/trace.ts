@@ -2,8 +2,9 @@ import { type RiverEvent, riversAlong } from "../data/rivers";
 import type { LngLat } from "../geo";
 import type { SourcePath } from "../ui/timeline";
 import { type Grid, gridAround, loadWide } from "./grid";
-import { farthestStem, mainStem, snap, tributaries } from "./hydro";
+import { farthestStem, mainStem, tributaries } from "./hydro";
 import { isSourceCut } from "./source-cut";
+import { stepM, traceDown } from "./trace-core";
 
 /** 雨粒がたどる流路。dist[i] は pts[i] までの流路長 m、rivers[].step は pts の添字 */
 export interface Path {
@@ -11,33 +12,6 @@ export interface Path {
   dist: number[];
   rivers: RiverEvent[];
   toSea: boolean;
-}
-
-/** 隣り合うセル p, q の間の距離 m */
-function stepM(g: Grid, p: number, q: number) {
-  const diagonal = q % g.W !== p % g.W && ((q / g.W) | 0) !== ((p / g.W) | 0);
-  return diagonal ? g.cellM * Math.SQRT2 : g.cellM;
-}
-
-/** 1つのグリッド内で s から海（または範囲の端）まで */
-function traceIn(g: Grid, s: number) {
-  const cells = [s];
-  const dist = [0];
-  let p = s;
-  let len = 0;
-  let toSea = false;
-  while (g.down[p] >= 0) {
-    const q = g.down[p];
-    len += stepM(g, p, q);
-    p = q;
-    cells.push(p);
-    dist.push(len);
-    if (Number.isNaN(g.elev[p])) {
-      toSea = true;
-      break;
-    }
-  }
-  return { cells, dist, toSea };
 }
 
 /**
@@ -54,39 +28,24 @@ export async function traceToSea(
   } = {},
 ): Promise<Path> {
   const { grow = true, withRivers = true } = opts;
-  const path: Path = { pts: [], dist: [], rivers: [], toSea: false };
-  let off = 0;
-  for (let hop = 0; hop < 8; hop++) {
-    const tr = traceIn(g, s);
-    const base = path.pts.length;
-    if (withRivers)
-      for (const r of riversAlong(g, tr.cells, base === 0))
-        if (path.rivers.at(-1)?.name !== r.name)
-          path.rivers.push({ ...r, step: base + r.step });
-    tr.cells.forEach((c, i) => {
-      path.pts.push(g.lngLat(c));
-      path.dist.push(off + tr.dist[i]);
-    });
-    off = path.dist[path.dist.length - 1];
-    if (tr.toSea) {
-      path.toSea = true;
-      break;
-    }
-    const exit = path.pts[path.pts.length - 1];
-    let next = gridAround(exit, g);
-    if (!next && grow) {
+  const rivers: RiverEvent[] = [];
+  const { pts, dist, toSea } = await traceDown(
+    g,
+    s,
+    async (exit, cur) => {
+      const next = gridAround(exit, cur);
+      if (next || !grow) return next ?? null;
       opts.say?.("下流の地形を読み込み中…");
-      next = await loadWide(exit);
-    }
-    if (!next) break;
-    g = next;
-    s = snap(g.acc, g.W, g.H, g.toCell(...exit), 2);
-    if (Number.isNaN(g.elev[s])) {
-      path.toSea = true;
-      break;
-    }
-  }
-  return path;
+      return loadWide(exit);
+    },
+    (cur, cells, base) => {
+      if (!withRivers) return;
+      for (const r of riversAlong(cur, cells, base === 0))
+        if (rivers.at(-1)?.name !== r.name)
+          rivers.push({ ...r, step: base + r.step });
+    },
+  );
+  return { pts, dist, rivers, toSea };
 }
 
 /** 支流として出す集水域の広さと、合流点の本筋に対する割合。小さな沢まで並べると本筋が埋もれる */
