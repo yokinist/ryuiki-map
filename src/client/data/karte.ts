@@ -2,7 +2,7 @@
 import { SOURCES } from "../config";
 import type { LngLat } from "../geo";
 import { pickBasin, touchesEdge } from "../terrain/basin-edge";
-import { type Grid, grids } from "../terrain/grid";
+import { type Grid, grids, loadWidest } from "../terrain/grid";
 import { snap, upstream } from "../terrain/hydro";
 import {
   type DamRow,
@@ -84,33 +84,58 @@ function karteFile<T>(kind: Kind, m1: number): Promise<T[]> {
   return file as Promise<T[]>;
 }
 
+/** 集水域を数えた候補（グリッドとその中の地点） */
+interface BasinCandidate {
+  g: Grid;
+  s: number;
+  up: Uint8Array;
+  truncated: boolean;
+  km2: number;
+}
+
+/** グリッド g で地点 p の集水域を数える。from 以外のグリッドでは約150mの範囲だけ吸着させ直す（近くの大きな川に跳ばないように） */
+function basinIn(g: Grid, from: { g: Grid; s: number }): BasinCandidate | null {
+  const [lon, lat] = from.g.lngLat(from.s);
+  const c = g === from.g ? from.s : g.toCell(lon, lat);
+  if (c < 0) return null;
+  const s =
+    g === from.g
+      ? c
+      : snap(g.acc, g.W, g.H, c, Math.max(1, Math.round(150 / g.cellM)));
+  const up = upstream(g.down, g.order, s);
+  return { g, s, up, truncated: touchesEdge(g, up), km2: g.acc[s] * g.cellKm2 };
+}
+
 /**
- * 雨の流れをたどった地点より上流の範囲。まず雨をたどったときのグリッドで数え、端に届いてしまうなら広域グリッド（約190km四方）で数え直す。
- * 広域では約150mの範囲だけ吸着させ直す（近くの大きな川に跳ばないように）。
+ * 雨の流れをたどった地点より上流の範囲を、読み込み済みのグリッドから選ぶ。
+ * まず雨をたどったときのグリッドで数え、端に届いてしまうなら広域グリッド（約190km四方）で数え直す。
  * truncated: 集水域が端に届いている（面積は実際より小さく、いちばん遠い水源も範囲の外にありうる）
  */
-export function basinAt(from: { g: Grid; s: number }) {
-  const [lon, lat] = from.g.lngLat(from.s);
+export function basinLoaded(from: { g: Grid; s: number }) {
   // 候補は pickBasin が必要とした分だけ数える（収まる範囲が見つかったら、残りのグリッドは数えない）
   function* candidates() {
     for (const g of [from.g, ...grids.wides]) {
-      const c = g === from.g ? from.s : g.toCell(lon, lat);
-      if (c < 0) continue;
-      const s =
-        g === from.g
-          ? c
-          : snap(g.acc, g.W, g.H, c, Math.max(1, Math.round(150 / g.cellM)));
-      const up = upstream(g.down, g.order, s);
-      yield {
-        g,
-        s,
-        up,
-        truncated: touchesEdge(g, up),
-        km2: g.acc[s] * g.cellKm2,
-      };
+      const c = basinIn(g, from);
+      if (c) yield c;
     }
   }
   return pickBasin(candidates());
+}
+
+/**
+ * 雨の流れをたどった地点より上流の範囲。読み込み済みのグリッドのどれにも収まらなければ、
+ * さかのぼり専用の粗い範囲（約360km四方）を読んで数え直す。それにも収まらなければ truncated のまま返す
+ */
+export async function basinAt(
+  from: { g: Grid; s: number },
+  say?: (text: string) => void,
+) {
+  const loaded = basinLoaded(from);
+  if (loaded && !loaded.truncated) return loaded;
+  // 読めなければ（通信の失敗など）、読み込み済みの範囲の結果（切れている）で続ける。止めて待たせない
+  const widest = await loadWidest(from.g.lngLat(from.s), say).catch(() => null);
+  const wide = widest && basinIn(widest, from);
+  return pickBasin([loaded, wide].filter((c): c is BasinCandidate => !!c));
 }
 
 /** グリッド g のセル s より上流の範囲の流域サマリ（降水量は別に precipitation で問い合わせる） */
@@ -118,7 +143,7 @@ export async function karteAt(from: {
   g: Grid;
   s: number;
 }): Promise<Karte | null> {
-  const basin = basinAt(from);
+  const basin = await basinAt(from);
   if (!basin) return null;
   const { g, s, up, truncated } = basin;
   let cells = 0;
