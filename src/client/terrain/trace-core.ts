@@ -52,39 +52,69 @@ export const MAX_HOPS = 8;
 
 /**
  * s から海まで。グリッドの端に出たら next で得た次のグリッドに乗り換えて続きを追う（next が null なら止まる）。
- * onSegment: グリッドごとの区間を受け取る（川の名前を引くなど）。base は区間の先頭が全体の何点目か
+ * onSegment: グリッドごとの区間を受け取る（川の名前を引くなど）。base は区間の先頭が全体の何点目か。
+ * cut: 各点で呼び、"stop" ならそこで止め（stopped）、{ to } を返せば範囲の端を待たずにそのグリッドへ乗り換える。
+ * r は乗り換え先で吸着させる半径（セル数）。省くと2セル
  */
 export async function traceDown<G extends TraceGrid>(
   g: G,
   s: number,
   next: (exit: LngLat, g: G) => Promise<G | null>,
   onSegment?: (g: G, cells: number[], base: number) => void,
-): Promise<{ pts: LngLat[]; dist: number[]; toSea: boolean }> {
+  cut?: (p: LngLat, g: G) => "stop" | { to: G; r?: number } | null,
+): Promise<{
+  pts: LngLat[];
+  dist: number[];
+  toSea: boolean;
+  stopped: boolean;
+}> {
   const pts: LngLat[] = [];
   const dist: number[] = [];
   let toSea = false;
+  let stopped = false;
   let off = 0;
   for (let hop = 0; hop < MAX_HOPS; hop++) {
     const tr = traceIn(g, s);
+    // 途中で止める・乗り換える点を探す（先頭の点は乗り換えてきた点なので見ない）
+    let switchTo: { to: G; r?: number } | null = null;
+    for (let i = 1; cut && i < tr.cells.length; i++) {
+      const r = cut(g.lngLat(tr.cells[i]), g);
+      if (!r) continue;
+      tr.cells.length = i + 1;
+      tr.dist.length = i + 1;
+      tr.toSea = false;
+      if (r === "stop") stopped = true;
+      else switchTo = r;
+      break;
+    }
     onSegment?.(g, tr.cells, pts.length);
     tr.cells.forEach((c, i) => {
       pts.push(g.lngLat(c));
       dist.push(off + tr.dist[i]);
     });
     off = dist[dist.length - 1];
-    if (tr.toSea) {
-      toSea = true;
-      break;
-    }
+    if (tr.toSea) toSea = true;
+    if (tr.toSea || stopped) break;
     const exit = pts[pts.length - 1];
-    const n = await next(exit, g);
+    const n = switchTo?.to ?? (await next(exit, g));
     if (!n) break;
     g = n;
-    s = snap(g.acc, g.W, g.H, g.toCell(...exit), 2);
+    s = snap(g.acc, g.W, g.H, g.toCell(...exit), switchTo?.r ?? 2);
     if (Number.isNaN(g.elev[s])) {
       toSea = true;
       break;
     }
   }
-  return { pts, dist, toSea };
+  return { pts, dist, toSea, stopped };
+}
+
+/** 2点間のおおよその距離 m（数百 m の判定用。緯度で経度方向を縮める平面近似） */
+function nearM([x1, y1]: LngLat, [x2, y2]: LngLat) {
+  const k = Math.cos((((y1 + y2) / 2) * Math.PI) / 180);
+  return Math.hypot((x2 - x1) * k, y2 - y1) * 111_320;
+}
+
+/** 道のり pts が target の半径 radiusM 以内を通った最初の点の添字。通らなければ -1 */
+export function joinIndex(pts: LngLat[], target: LngLat, radiusM: number) {
+  return pts.findIndex((p) => nearM(p, target) <= radiusM);
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { LngLat } from "../geo";
-import { type TraceGrid, traceDown, traceIn } from "./trace-core";
+import { joinIndex, type TraceGrid, traceDown, traceIn } from "./trace-core";
 
 /**
  * 1行の格子（W×1）を「経度 x0〜」に置いた模型。down は右隣（x+1）へ。
@@ -106,5 +106,108 @@ describe("stepM: 行ごとのセルの大きさ（rowM）があれば、それ�
     };
     const t = traceIn(g, 0);
     expect(t.dist).toEqual([0, 85, 180]);
+  });
+});
+
+describe("traceDown の cut: 途中で止める・細かい範囲に乗り換える", () => {
+  it("stop を返した点で止め、stopped になる（クリック地点に着いた）", async () => {
+    const a = row(0, 6);
+    const t = await traceDown(
+      a,
+      0,
+      async () => null,
+      undefined,
+      (p) => (p[0] === 3.5 ? "stop" : null),
+    );
+    expect(t.stopped).toBe(true);
+    expect(t.pts.map((p) => p[0])).toEqual([0.5, 1.5, 2.5, 3.5]);
+    expect(t.dist[t.dist.length - 1]).toBe(300);
+  });
+
+  it("乗り換えるときに吸着の半径 r を渡すと、その範囲で一番大きい流れに乗る（細かい範囲で本流の隣の水路に乗らないように）", async () => {
+    const a = row(0, 6);
+    // 経度 2〜6 の細かい範囲を4行にする。上の行（y=0）は水路で出口へ、y=1・2 は流れのないセル、
+    // 下の行（y=3）が本流で x=3 が海。水路から本流までは3行離れている
+    const W = 4;
+    const fine: TraceGrid = {
+      W,
+      H: 4,
+      cellM: 100,
+      down: new Int32Array([
+        1, 2, 3, -1, -1, -1, -1, -1, -1, -1, -1, -1, 13, 14, 15, -1,
+      ]),
+      elev: new Float32Array([...Array(15).fill(10), Number.NaN]),
+      acc: new Float32Array([
+        1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 50, 60, 70, 80,
+      ]),
+      lngLat: (c) => [2 + (c % W) + 0.5, (c / W) | 0],
+      toCell: (lon, lat) => Math.floor(lat) * W + Math.floor(lon - 2),
+    };
+    const stay = await traceDown(
+      a,
+      0,
+      async () => null,
+      undefined,
+      (p, g) => (g === a && p[0] >= 2.5 ? { to: fine } : null),
+    );
+    expect(stay.toSea).toBe(false); // 半径を渡さなければ（2セル）y=0 の水路のまま。本流に乗らない
+    const main = await traceDown(
+      a,
+      0,
+      async () => null,
+      undefined,
+      (p, g) => (g === a && p[0] >= 2.5 ? { to: fine, r: 3 } : null),
+    );
+    expect(main.toSea).toBe(true);
+  });
+
+  it("別のグリッドを返した点で、そのグリッドに乗り換えて続ける（範囲の端を待たない）", async () => {
+    const a = row(0, 6); // 粗い範囲
+    const fine = row(2, 4, 3); // 経度 2〜6 の細かい範囲。x=3（経度 5.5）が海
+    const seen: TraceGrid[] = [];
+    const t = await traceDown(
+      a,
+      0,
+      async () => null,
+      (g) => {
+        seen.push(g);
+      },
+      (p, g) => (g === a && fine.toCell(p[0], 0) >= 0 ? { to: fine } : null),
+    );
+    expect(seen).toEqual([a, fine]);
+    expect(t.toSea).toBe(true);
+    // a で 0.5, 1.5, 2.5 まで進み、2.5 で fine に乗り換えて 2.5, 3.5, 4.5, 5.5
+    expect(t.pts.map((p) => p[0])).toEqual([0.5, 1.5, 2.5, 2.5, 3.5, 4.5, 5.5]);
+  });
+
+  it("一度も stop にならなければ stopped は false（呼び出し側は粗い道のりに戻す）", async () => {
+    const a = row(0, 4, 3);
+    const t = await traceDown(
+      a,
+      0,
+      async () => null,
+      undefined,
+      () => null,
+    );
+    expect(t.stopped).toBe(false);
+    expect(t.toSea).toBe(true);
+  });
+});
+
+describe("joinIndex: 道のりが目標の地点のそばを通ったか", () => {
+  const pts: LngLat[] = [
+    [139.0, 36.0],
+    [139.001, 36.0],
+    [139.002, 36.0],
+  ];
+
+  it("半径 m 以内に入った最初の点の添字を返す", () => {
+    // 経度 0.001 度は北緯36度で約90m
+    expect(joinIndex(pts, [139.002, 36.0005], 100)).toBe(2); // 約55m
+    expect(joinIndex(pts, [139.0011, 36.0], 20)).toBe(1); // 約9m
+  });
+
+  it("どの点も半径の外なら -1", () => {
+    expect(joinIndex(pts, [139.01, 36.01], 100)).toBe(-1);
   });
 });
