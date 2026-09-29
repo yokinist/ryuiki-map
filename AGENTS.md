@@ -8,7 +8,9 @@
 
 ## 公開
 
-`main` に push すると、GitHub Actions が CI（型チェック・Lint・テスト・ビルド）のあとに Cloudflare Workers へデプロイする（`.github/workflows/ci.yml`）。手元の `pnpm deploy` は、Actions を待たずに出したいときだけ使う。同じリポジトリのブランチからの PR では、本番とは別の版をプレビュー（`pr-<番号>-ryuiki-map.ykns.workers.dev`）として出し、URL を PR にコメントする（フォークからの PR では出ない）。
+`main` はブランチ保護で PR 経由のマージだけを受け付ける（Rebase か Squash。マージコミット不可。必須チェックは `ci.yml` の `test`）。作業は `main` から切ったブランチで行い、PR を出す。Rebase で入れる PR は、各コミットの題名も Conventional Commits にそろえる。
+
+`main` にマージされると、GitHub Actions が CI（型チェック・Lint・テスト・ビルド）のあとに Cloudflare Workers へデプロイする（`.github/workflows/ci.yml`）。手元の `pnpm deploy` は、Actions を待たずに出したいときだけ使う。同じリポジトリのブランチからの PR では、本番とは別の版をプレビュー（`pr-<番号>-ryuiki-map.ykns.workers.dev`）として出し、URL を PR にコメントする（フォークからの PR では出ない）。
 
 ## 書き方
 

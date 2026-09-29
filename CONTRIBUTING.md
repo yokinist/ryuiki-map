@@ -34,7 +34,11 @@
 
 ## Pull Request
 
-- コミットメッセージは [Conventional Commits](https://www.conventionalcommits.org/ja/v1.0.0/)（`feat:`・`fix:`・`docs:` など）で、題名は日本語で書いてください
+- `main` へは Pull Request からだけ入れられます（メンテナも同じです）。`main` から作業用のブランチを切ってください
+- コミットメッセージは [Conventional Commits](https://www.conventionalcommits.org/ja/v1.0.0/)（`feat:`・`fix:`・`docs:` など）で、題名は日本語で書いてください。PR のタイトルも同じ形にしてください
+- マージのしかたは次の2つです。マージコミットは作りません（`main` の履歴を一直線に保つため）
+  - **Rebase**：PR のコミットをそのまま `main` に積みます。コミットごとの履歴が残るので、各コミットの題名も上の形にそろえ、途中の「wip」などはまとめてから出してください
+  - **Squash**：PR 全体を1コミットにまとめます。コミットメッセージには PR のタイトルと説明が使われます。コミットが細かく分かれている PR はこちらでマージします
 - PR を出す前に、次が通ることを確かめてください。`index.html`・`vite.config.ts`・`site.*.ts`・`wrangler.jsonc` を触ったときは `pnpm build` も
 
   ```sh
@@ -42,7 +46,7 @@
   ```
 
 - PR のひな形に沿って、手で確かめたこと（試した地点の URL やスクリーンショット）を書いてください
-- PR を出すと、GitHub Actions で型チェック・Lint・テスト・ビルドが走ります
+- PR を出すと、GitHub Actions で型チェック・Lint・テスト・ビルドが走ります。これ（`test`）が通り、ブランチが最新の `main` に追いついていないとマージできません。遅れているときは PR の「Update branch」で追いつけます
 - 同じリポジトリのブランチからの PR では、実際に触れるプレビュー URL が PR にコメントされます（push のたびに更新。本番には影響せず、検索にも載りません）。フォークからの PR では作られません。必要なときは、メンテナが中身を確かめてから本リポジトリのブランチに移して作ります
 - 同じリポジトリのブランチからの PR には、[AGENTS.md](AGENTS.md) の決まりに沿った自動レビュー（Claude Code Action）が付きます。フォークからの PR では、メンテナが `@claude review` とコメントして起動します。自動レビューは参考で、最終的な判断はメンテナが行います
 - `main` にマージされると、そのまま本番（https://ryuiki-map.ykns.workers.dev/）に自動で公開されます
