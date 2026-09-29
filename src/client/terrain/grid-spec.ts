@@ -22,21 +22,40 @@ export interface GridSpec {
   lngLat: (c: number) => LngLat;
 }
 
+/** 標高タイルの範囲（タイル番号、両端を含む） */
+export interface TileRange {
+  tx0: number;
+  tx1: number;
+  ty0: number;
+  ty1: number;
+}
+
+/** タイルの範囲を覆う bbox（隣のタイルにはみ出さないよう、ほんの少し内側） */
+export function tilesBBox(z: number, t: TileRange): BBox {
+  const n = 2 ** z;
+  const e = 1e-9;
+  return [
+    xToLon(t.tx0 / n) + e,
+    yToLat((t.ty1 + 1) / n) + e,
+    xToLon((t.tx1 + 1) / n) - e,
+    yToLat(t.ty0 / n) - e,
+  ];
+}
+
 /**
  * p を中心に、ズーム z の標高タイルちょうど縦横 tiles 枚を覆う bbox。
  * タイル境界に揃える（中心がタイルの境目からずれると1列余分に読むので）
  */
 export function bboxAround([lon, lat]: LngLat, z: number, tiles: number): BBox {
   const n = 2 ** z;
-  const tx = Math.floor(lonToX(lon) * n) - Math.floor(tiles / 2);
-  const ty = Math.floor(latToY(lat) * n) - Math.floor(tiles / 2);
-  const e = 1e-9; // 隣のタイルにはみ出さないよう、ほんの少し内側
-  return [
-    xToLon(tx / n) + e,
-    yToLat((ty + tiles) / n) + e,
-    xToLon((tx + tiles) / n) - e,
-    yToLat(ty / n) - e,
-  ];
+  const tx0 = Math.floor(lonToX(lon) * n) - Math.floor(tiles / 2);
+  const ty0 = Math.floor(latToY(lat) * n) - Math.floor(tiles / 2);
+  return tilesBBox(z, {
+    tx0,
+    tx1: tx0 + tiles - 1,
+    ty0,
+    ty1: ty0 + tiles - 1,
+  });
 }
 
 /** bbox を覆うグリッド。z を省くとタイル数が MAX_TILES に収まる一番細かいズームを選ぶ */

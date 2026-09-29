@@ -1,9 +1,14 @@
 import { WIDE, WIDEST } from "../config";
 import type { RiverProps } from "../data/rivers";
 import type { BBox, LngLat } from "../geo";
-import { type TileRange, tilesBBox } from "./basin-range";
 import type { BuildDone, BuildMessage, BuildRequest } from "./grid.worker";
-import { bboxAround, type GridSpec, gridSpec } from "./grid-spec";
+import {
+  bboxAround,
+  type GridSpec,
+  gridSpec,
+  type TileRange,
+  tilesBBox,
+} from "./grid-spec";
 import type { Routed } from "./hydro";
 
 export type { GridSpec };
