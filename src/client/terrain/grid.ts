@@ -1,6 +1,7 @@
 import { WIDE, WIDEST } from "../config";
 import type { RiverProps } from "../data/rivers";
 import type { BBox, LngLat } from "../geo";
+import { type TileRange, tilesBBox } from "./basin-range";
 import type { BuildDone, BuildMessage, BuildRequest } from "./grid.worker";
 import { bboxAround, type GridSpec, gridSpec } from "./grid-spec";
 import type { Routed } from "./hydro";
@@ -126,19 +127,24 @@ export function addWide(g: Grid) {
 }
 
 /**
- * p を中心にした、さかのぼり専用の粗い範囲。同じ中心で読み込み済み・読み込み中ならそれを使う
- * （流域サマリと「上流へさかのぼる」が重なっても二重に読まない）。別の地点を中心に読んだ範囲は使い回さない。
- * 集水域が収まるかは中心の位置で変わるので、使い回すと同じ地点でも直前の操作しだいで結果が変わってしまう
+ * さかのぼり専用の粗い範囲を、集水域に合わせたタイルの範囲（basin-range.ts の widestTiles）で読む。
+ * 同じ範囲が読み込み済み・読み込み中ならそれを使う（先読みと「上流へさかのぼる」・流域サマリが重なっても二重に読まない）
  */
 let widestKey = "";
 let widestLoading: { key: string; promise: Promise<Grid> } | null = null;
-export function loadWidest(p: LngLat, say?: (text: string) => void) {
-  const key = p.map((v) => v.toFixed(5)).join(",");
+export function loadWidest(range: TileRange, say?: (text: string) => void) {
+  const key = `${range.tx0},${range.tx1},${range.ty0},${range.ty1}`;
   if (grids.widest && widestKey === key) return Promise.resolve(grids.widest);
   if (widestLoading?.key === key) return widestLoading.promise;
-  const promise = buildAround(p, WIDEST.z, WIDEST.tiles, say).then((g) => {
-    grids.widest = g;
-    widestKey = key;
+  const promise = buildGrid(tilesBBox(WIDEST.z, range), {
+    z: WIDEST.z,
+    say,
+  }).then((g) => {
+    // 後から頼まれた範囲の読み込みが走っていれば、そちらを残す（古い範囲で上書きして二重に読ませない）
+    if (!widestLoading || widestLoading.key === key) {
+      grids.widest = g;
+      widestKey = key;
+    }
     return g;
   });
   widestLoading = { key, promise };

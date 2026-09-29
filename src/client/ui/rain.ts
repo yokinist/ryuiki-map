@@ -1,5 +1,10 @@
 import maplibregl, { type Map as MlMap } from "maplibre-gl";
-import { basinAt, type DamOnPath, damsAlong } from "../data/karte";
+import {
+  basinAt,
+  type DamOnPath,
+  damsAlong,
+  prefetchBasin,
+} from "../data/karte";
 import {
   type Place,
   type PlaceEvent,
@@ -327,7 +332,13 @@ export class Rain {
             this.showArrival(path, mouth ?? null);
             this.scrollToActions();
           });
+        // 大きな川では、さかのぼり専用の粗い範囲を先に読んでおく（押されたときに待たせない）。
+        // 集水域を数えるのに数十 ms かかるので、着地の動きを止めないよう、カメラが着地し終えてから始める
         if (up) this.upButton?.click();
+        else
+          this.camera?.landed.then(() => {
+            if (alive() && this.showing === "route") prefetchBasin({ g, s });
+          });
       });
     if (up) {
       // さかのぼった状態の共有URL: 下る動きは見せず、雨の通り道の時系列だけ作ってすぐにさかのぼる
