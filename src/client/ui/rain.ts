@@ -338,11 +338,15 @@ export class Rain {
             this.scrollToActions();
           });
         // 大きな川では、さかのぼり専用の粗い範囲を先に読んでおく（押されたときに待たせない）。
-        // 集水域を数えるのに数十 ms かかるので、着地の動きを止めないよう、カメラが着地し終えてから始める
+        // 集水域を数えるのに数十 ms かかるので、着地の動きを止めないよう、カメラが着地し終えてから始める。
+        // クリックした範囲からはみ出していたら、さかのぼるときと同じ集水域で塗り直す（さかのぼりに移っていれば playSource が塗る）
         if (up) this.upButton?.click();
         else
-          this.camera?.landed.then(() => {
-            if (alive() && this.showing === "route") prefetchBasin({ g, s });
+          this.camera?.landed.then(async () => {
+            if (!alive() || this.showing !== "route") return;
+            const basin = await prefetchBasin({ g, s });
+            if (alive() && this.showing === "route" && basin && basin.g !== g)
+              this.showBasin(basin.g, basin.s, alive, basin.up);
           });
       });
     if (up) {

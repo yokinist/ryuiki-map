@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { expectKmNear, lastRow, waitForArrival } from "./helpers";
+import { expectKmNear, lastRow, waitForArrival, watchPlaces } from "./helpers";
 
 // 代表地点。計算やデータを変えて結果が変わったことに気づくための表。1行足せば地点が増える。
 // 期待値は実際の表示から置いている（距離は ±10%）
@@ -75,6 +75,7 @@ const up = [
 
 for (const c of down) {
   test(`下り: ${c.name} → ${c.sea} ${c.km}km`, async ({ page }) => {
+    const expectPlace = watchPlaces(page);
     await page.goto(`/?p=${c.p}`);
     await waitForArrival(page);
     await expect(page.locator("#headline")).toHaveText(
@@ -82,8 +83,8 @@ for (const c of down) {
     );
     const end = lastRow(page.locator("#timeline"));
     await expect(end).toContainText(`${c.sea}へ`);
-    await expect(end).toContainText(c.mouth);
     expectKmNear(await end.innerText(), c.km);
+    await expectPlace(end, c.mouth);
   });
 }
 
@@ -91,13 +92,15 @@ for (const c of up) {
   test(`上り: ${c.name} → ${c.reached ? "水源" : "追いきれない"} ${c.km}km`, async ({
     page,
   }) => {
+    const expectPlace = watchPlaces(page);
     await page.goto(`/?p=${c.p}&dir=up`);
     await waitForArrival(page);
     await expect(page.locator("#headline")).toHaveText(
       c.reached ? "水源にたどり着きました" : "水源まで追いきれませんでした",
     );
     const end = lastRow(page.locator("#source-timeline"));
-    await expect(end).toContainText(c.source);
+    await expect(end).toContainText(c.reached ? "水源" : "追いきれません");
     expectKmNear(await end.innerText(), c.km);
+    await expectPlace(end, c.source);
   });
 }
