@@ -257,6 +257,8 @@ wrangler.jsonc           Cloudflare Workers の設定。静的アセットを配
 | OG 画像の文字（ヒラギノ角ゴシック） | macOS 同梱フォント | 画像にした文字はフォントの再配布にあたらない | 画像として描いただけで、フォントファイルは含めていない |
 | 開発用ツール（Vite・Biome・Vitest・wrangler・geotiff など） | MIT など | — | 配信物に含まれない（`dist/licenses.md` に出てこない） |
 
+アクセス数は [Cloudflare Web Analytics](https://www.cloudflare.com/web-analytics/) で集計している。クッキーを使わず、個人を特定しない範囲（ページの表示数・参照元・国・表示速度）だけを取る。計測タグは `site.config.ts` の `analyticsToken` があるときだけ、ビルドで `index.html` に入る（開発サーバーでは入らない）。PR のプレビューも同じビルドなので、ページを開いたホストが本番（`site.config.ts` の `url`）のときだけ計測を読み込む。アプリ内の「利用上の注意」と `/llms.txt` にも書いている。
+
 ライセンス違反ではないが、変わりうる前提:
 
 - **Open-Meteo**: 無料で使えるのは非商用の間だけ。広告を載せるなど商用にするなら有料プランに切り替える

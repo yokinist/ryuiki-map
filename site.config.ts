@@ -15,6 +15,8 @@ export const SITE = {
   ogImage: `${url}og.png`,
   ogTagline: "ここに降った雨は、どこの海へ？",
   ogImageAlt: "流域探索マップのタイトルと、格子上に淡く描かれた関東の河川網",
+  // Cloudflare Web Analytics のトークン（公開されてよい値）。空なら計測タグを出さない
+  analyticsToken: "89fcd3d179304341ad7c324643c9436b",
 };
 
 /** 検索エンジンや AI が読む構造化データ（schema.org）。index.html の <head> に JSON-LD で入る */

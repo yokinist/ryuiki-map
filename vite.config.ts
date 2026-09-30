@@ -10,7 +10,8 @@ const escapeHtml = (s: string) =>
 
 /**
  * index.html の {{キー}} を SITE の値に置き換え、構造化データを <head> に足す。
- * ないキーは書き間違いなのでビルドを止める。本番ではソース用の HTML コメントも外す
+ * ないキーは書き間違いなのでビルドを止める。本番ではソース用の HTML コメントも外す。
+ * 計測タグはビルドでトークンがあるときだけ足し、本番のホストでだけ読み込む（開発・プレビューは数えない）
  */
 const siteConfig = (): Plugin => ({
   name: "site-config",
@@ -32,6 +33,22 @@ const siteConfig = (): Plugin => ({
         children: JSON.stringify(STRUCTURED_DATA).replace(/</g, "\\u003c"),
         injectTo: "head",
       },
+      ...(!ctx.server && SITE.analyticsToken
+        ? [
+            {
+              tag: "script",
+              // PR のプレビューも同じビルドなので、開いたホストが本番のときだけ読み込む
+              children: `if (location.hostname === ${JSON.stringify(new URL(SITE.url).hostname)}) {
+  const s = document.createElement("script");
+  s.defer = true;
+  s.src = "https://static.cloudflareinsights.com/beacon.min.js";
+  s.dataset.cfBeacon = ${JSON.stringify(JSON.stringify({ token: SITE.analyticsToken }))};
+  document.body.append(s);
+}`,
+              injectTo: "body" as const,
+            },
+          ]
+        : []),
     ],
   }),
 });
