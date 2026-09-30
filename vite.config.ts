@@ -39,7 +39,7 @@ const siteConfig = (): Plugin => ({
               tag: "script",
               // PR のプレビューも同じビルドなので、開いたホストが本番のときだけ読み込む。
               // beacon は地図を動かすたびの URL の書き換え（replaceState・#）も1回の表示と数えるので、beacon より先に
-              // Navigation API の navigate を止め、main.ts が知らせる画面（/down・/up）だけを仮の移動として渡す
+              // Navigation API の navigate を止め、main.ts が screenview で知らせる画面（/down・/up）だけを仮の移動として渡す
               children: `if (location.hostname === ${JSON.stringify(new URL(SITE.url).hostname)}) {
   const nav = window.navigation;
   let view;
