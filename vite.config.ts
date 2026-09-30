@@ -37,8 +37,23 @@ const siteConfig = (): Plugin => ({
         ? [
             {
               tag: "script",
-              // PR のプレビューも同じビルドなので、開いたホストが本番のときだけ読み込む
+              // PR のプレビューも同じビルドなので、開いたホストが本番のときだけ読み込む。
+              // beacon は地図を動かすたびの URL の書き換え（replaceState・#）も1回の表示と数えるので、beacon より先に
+              // Navigation API の navigate を止め、main.ts が知らせる画面（/down・/up）だけを仮の移動として渡す
               children: `if (location.hostname === ${JSON.stringify(new URL(SITE.url).hostname)}) {
+  const nav = window.navigation;
+  let view;
+  nav?.addEventListener("navigate", (e) => {
+    if (e !== view) e.stopImmediatePropagation();
+  });
+  // ponytail: beacon の公開されていない作り（navigate の destination.url を数える）に頼る。変わったら /down・/up が数えられなくなるだけ
+  addEventListener("screenview", (e) => {
+    view = Object.assign(new Event("navigate"), {
+      canIntercept: true,
+      destination: { url: location.origin + e.detail, sameDocument: true },
+    });
+    nav?.dispatchEvent(view);
+  });
   const s = document.createElement("script");
   s.defer = true;
   s.src = "https://static.cloudflareinsights.com/beacon.min.js";

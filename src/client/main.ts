@@ -262,7 +262,15 @@ const rain = new Rain(
   status,
   // 共有用に、吸着後の地点と、見ている道のり（水の来た道なら dir=up）を URL に残す
   (p) => setParam("p", p.map((v) => v.toFixed(5)).join(",")),
-  (kind) => setParam("dir", kind === "source" ? "up" : null),
+  (kind) => {
+    setParam("dir", kind === "source" ? "up" : null);
+    // 画面ごとの表示数を数える（計測は本番のビルドにだけ入る。vite.config.ts の siteConfig）
+    dispatchEvent(
+      new CustomEvent("screenview", {
+        detail: kind === "source" ? "/up" : "/down",
+      }),
+    );
+  },
 );
 
 const viewBBox = (): BBox => {
