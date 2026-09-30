@@ -257,7 +257,9 @@ wrangler.jsonc           Cloudflare Workers の設定。静的アセットを配
 | OG 画像の文字（ヒラギノ角ゴシック） | macOS 同梱フォント | 画像にした文字はフォントの再配布にあたらない | 画像として描いただけで、フォントファイルは含めていない |
 | 開発用ツール（Vite・Biome・Vitest・wrangler・geotiff など） | MIT など | — | 配信物に含まれない（`dist/licenses.md` に出てこない） |
 
-アクセス数は [Cloudflare Web Analytics](https://www.cloudflare.com/web-analytics/) で集計している。クッキーを使わず、個人を特定しない範囲（ページの表示数・参照元・国・表示速度）だけを取る。計測タグは `site.config.ts` の `analyticsToken` があるときだけ、ビルドで `index.html` に入る（開発サーバーでは入らない）。PR のプレビューも同じビルドなので、ページを開いたホストが本番（`site.config.ts` の `url`）のときだけ計測を読み込む。アプリ内の「利用上の注意」と `/llms.txt` にも書いている。
+アクセス数は [Cloudflare Web Analytics](https://www.cloudflare.com/web-analytics/) で集計している。クッキーを使わず、個人を特定しない範囲（画面ごとの表示数・参照元・国・表示速度）だけを取る。計測タグは `site.config.ts` の `analyticsToken` があるときだけ、ビルドで `index.html` に入る（開発サーバーでは入らない）。PR のプレビューも同じビルドなので、ページを開いたホストが本番（`site.config.ts` の `url`）のときだけ計測を読み込む。アプリ内の「利用上の注意」と `/llms.txt` にも書いている。
+
+ページは1枚だけなので、画面はダッシュボードのパスで分ける。`/` は開いた回数（地図）、`/down` は雨の通り道、`/up` は水の来た道を見始めた回数。beacon は URL の書き換えを1回の表示と数えるので、地図を動かすたびの書き換え（`replaceState`・`#`）は beacon に届く前に止め、`main.ts` が知らせる画面の切り替えだけを仮のパスとして渡している（`vite.config.ts` の `siteConfig`）。検索部分（`?p=`）と `#` は beacon が消してから送るので、クリックした地点は送られない。Navigation API のないブラウザでは `/` だけを数える。
 
 ライセンス違反ではないが、変わりうる前提:
 
