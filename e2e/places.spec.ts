@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { expectKmNear, lastRow, waitForArrival, watchPlaces } from "./helpers";
+import { expectKmNear, lastRow, waitForArrival } from "./helpers";
 
 // 代表地点。計算やデータを変えて結果が変わったことに気づくための表。1行足せば地点が増える。
 // 期待値は実際の表示から置いている（距離は ±10%）
@@ -24,7 +24,7 @@ const down = [
     name: "淀川 大阪付近",
     p: "135.5144,34.7237",
     sea: "瀬戸内海",
-    mouth: /淀川河口（大阪府大阪市西淀川区/,
+    mouth: /淀川河口（大阪府大阪市(西淀川区|此花区)/, // 河口は両区の境。1kmメッシュの表ではどちらの岸にもなる
     km: 9.9,
   },
 ];
@@ -38,7 +38,7 @@ const up = [
     name: "多摩川 狛江付近",
     p: "139.6008,35.6172",
     reached: true,
-    source: /水源（埼玉県秩父市/,
+    source: /水源（(山梨県甲州市|埼玉県秩父市)/, // 笠取山は両市の境（水干は山梨側）
     km: 104.8,
   },
   {
@@ -75,7 +75,6 @@ const up = [
 
 for (const c of down) {
   test(`下り: ${c.name} → ${c.sea} ${c.km}km`, async ({ page }) => {
-    const expectPlace = watchPlaces(page);
     await page.goto(`/?p=${c.p}`);
     await waitForArrival(page);
     await expect(page.locator("#headline")).toHaveText(
@@ -84,7 +83,7 @@ for (const c of down) {
     const end = lastRow(page.locator("#timeline"));
     await expect(end).toContainText(`${c.sea}へ`);
     expectKmNear(await end.innerText(), c.km);
-    await expectPlace(end, c.mouth);
+    await expect(end).toContainText(c.mouth);
   });
 }
 
@@ -92,7 +91,6 @@ for (const c of up) {
   test(`上り: ${c.name} → ${c.reached ? "水源" : "追いきれない"} ${c.km}km`, async ({
     page,
   }) => {
-    const expectPlace = watchPlaces(page);
     await page.goto(`/?p=${c.p}&dir=up`);
     await waitForArrival(page);
     await expect(page.locator("#headline")).toHaveText(
@@ -101,6 +99,6 @@ for (const c of up) {
     const end = lastRow(page.locator("#source-timeline"));
     await expect(end).toContainText(c.reached ? "水源" : "追いきれません");
     expectKmNear(await end.innerText(), c.km);
-    await expectPlace(end, c.source);
+    await expect(end).toContainText(c.source);
   });
 }

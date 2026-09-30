@@ -19,36 +19,35 @@ const path: Path = {
   ],
   toSea: true,
 };
-const place = (key: string, aza: string, step: number): PlaceEvent => ({
+const place = (key: string, muni: string, step: number): PlaceEvent => ({
   key,
   pref: "群馬県",
-  muni: "沼田市",
-  aza,
+  muni,
   step,
 });
-const origin = place("1", "岩本町", 0);
-const places = [origin, place("2", "戸鹿野町", 1)];
+const origin = place("10206", "沼田市", 0);
+const places = [origin, place("10443", "昭和村", 1)];
 const mouth = { sea: "太平洋", name: "利根川河口（千葉県銚子市）" };
 
 describe("mouthName", () => {
   const choshi = { pref: "千葉県", muni: "銚子市" };
-  it("住所が分かる前は川の名前だけで出し、分かったら書き足す", () => {
+  it("市区町村が分かる前は川の名前だけで出し、分かったら書き足す", () => {
     expect(mouthName("利根川", null)).toBe("利根川河口");
     expect(mouthName("利根川", choshi)).toBe("利根川河口（千葉県銚子市）");
   });
-  it("川の名前がなければ海岸の住所", () => {
+  it("川の名前がなければ海岸の市区町村", () => {
     expect(mouthName(undefined, choshi)).toBe("千葉県銚子市の海岸");
     expect(mouthName(undefined, null)).toBeNull();
   });
 });
 
 describe("timelineEvents", () => {
-  it("川の移り変わりと、出発点以外の地区を出す", () => {
+  it("川の移り変わりと、出発点以外の市区町村を出す", () => {
     const events = timelineEvents(path, places, origin, mouth, 0);
     expect(events.map((e) => [e.kind, e.title, e.sub])).toEqual([
       ["river", "片品川をくだりはじめる", "すぐに"],
       ["river", "利根川に合流", `片品川 → 利根川・${distance(2000)}`],
-      ["place", "群馬県沼田市 戸鹿野町", `片品川沿い・${distance(1000)}`],
+      ["place", "群馬県昭和村", `片品川沿い・${distance(1000)}`],
     ]);
   });
 
@@ -109,26 +108,28 @@ const source = {
 };
 
 describe("sourceEvents", () => {
-  it("さかのぼる川・流れ込む支流・地区・水源を、上流への距離と何時間前の雨かを添えて出す", () => {
+  it("さかのぼる川・流れ込む支流・市区町村・水源を、上流への距離と何時間前の雨かを添えて出す", () => {
     const events = sourceEvents(
       source,
-      [origin, place("3", "利根町", 2)],
+      [origin, place("10443", "昭和村", 2)],
       origin,
     );
     expect(events.map((e) => [e.kind, e.title, e.sub])).toEqual([
       ["river", "利根川をさかのぼる", "ここから"],
       ["river", "片品川をさかのぼる", "利根川 → 片品川・2.0 km上流・約33分前"],
       ["branch", "薄根川が流れ込む", "利根川・1.0 km上流・約17分前"],
-      ["place", "群馬県沼田市 利根町", "片品川沿い・2.0 km上流・約33分前"],
+      ["place", "群馬県昭和村", "片品川沿い・2.0 km上流・約33分前"],
       ["end", "水源", "標高 1,800 m・3.0 km上流・約50分前"],
     ]);
   });
 
-  it("水源の地区が分かったら、地名を見出しにする", () => {
-    const end = sourceEvents(source, [], null, place("9", "藤原", 3)).at(-1);
+  it("水源の市区町村が分かったら、地名を見出しにする", () => {
+    const end = sourceEvents(source, [], null, place("10444", "片品村", 3)).at(
+      -1,
+    );
     expect(end).toMatchObject({
       kind: "end",
-      title: "水源（群馬県沼田市 藤原）",
+      title: "水源（群馬県片品村）",
       sub: "標高 1,800 m・3.0 km上流・約50分前",
     });
   });
