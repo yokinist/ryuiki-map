@@ -55,7 +55,6 @@ const siteConfig = (): Plugin => ({
     nav?.dispatchEvent(view);
   });
   const s = document.createElement("script");
-  s.defer = true;
   s.src = "https://static.cloudflareinsights.com/beacon.min.js";
   s.dataset.cfBeacon = ${JSON.stringify(JSON.stringify({ token: SITE.analyticsToken }))};
   document.body.append(s);
