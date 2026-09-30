@@ -22,6 +22,7 @@
     "format": "biome format --write .",
     "build:rivers": "node scripts/build-rivers.ts",
     "build:karte": "node scripts/build-karte.ts",
+    "build:munis": "node scripts/build-munis.ts",
     "build:seas": "node scripts/build-seas.ts",
     "build:hill": "node scripts/build-hill-index.ts",
     "build:og": "node scripts/build-og.ts"

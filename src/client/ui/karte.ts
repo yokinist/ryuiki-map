@@ -111,7 +111,7 @@ export async function openKarte(
   place.then((p) => {
     if (!entry || entry !== e || !p) return;
     e.place = placeName(p);
-    if (!river) e.title = p.aza || p.muni;
+    if (!river) e.title = p.muni;
     render();
   });
 

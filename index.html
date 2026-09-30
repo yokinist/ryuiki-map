@@ -73,7 +73,7 @@
           <li>対象は日本国内の陸地です（標高・河川データの範囲）。国外や遠く離れた海は選べません。</li>
           <li>流れの向きは標高タイル（約10〜240mメッシュ）から計算した推定です。平地・市街地・用水路のある場所では実際と異なることがあります。</li>
           <li>川の名前と河川線は OpenStreetMap のものです。日本の河川線の多くは国土数値情報（河川データ）2006年度版を取り込んだもので、その後の改修や名称の変更は反映されていないことがあります。</li>
-          <li>地区名は地理院の逆ジオコーダによる大字単位の目安です。</li>
+          <li>地名は市区町村までです。1kmメッシュごとに引くので、市区町村の境界から1km以内では隣の市区町村になることがあります。境界は2020年10月1日現在のものです。</li>
           <li>海の名前は国際水路機関（IHO）の海域区分によります。関東以西の太平洋側（IHO の区分ではフィリピン海）も太平洋と表示しています。</li>
           <li>所要時間は流速1m/sと仮定したおおよその目安です。</li>
           <li>流域サマリの人口は1kmメッシュの人口を面積で按分した推定、土地の使われ方は衛星画像の分類（約70mに縮小して集計）、年間降水量は範囲の中心1地点の再解析値で、どれも目安です。ダム・堰は OpenStreetMap に登録されているものだけを数え、雨の通り道・水の来た道には流路から約250m以内のものを出しています。</li>
@@ -86,13 +86,16 @@
         <p>ソースコードは <a href="{{repo}}/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a>（同梱ライブラリのライセンスは <a href="/licenses.md" target="_blank">/licenses.md</a>）。地図データは出典ごとに次のライセンス。</p>
         <ul class="about__list">
           <li>
-            <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>（白地図・淡色地図・陰影起伏図・標高タイル）、地理院 逆ジオコーダ（国土地理院）
+            <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>（白地図・淡色地図・陰影起伏図・標高タイル）（国土地理院）
           </li>
           <li>
             河川線と名前: <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a>。<a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener">ODbL</a> のもとで利用し、地図表示と流向計算のために変換したデータ（<a href="/rivers/README.txt" target="_blank">/rivers/</a>）も ODbL で提供しています。日本の河川線の多くは「国土数値情報（河川データ）」（国土交通省）を、2012年に国土交通省の了承を得て OpenStreetMap に取り込んだものです。国土数値情報の河川データは現在「非商用」の条件で提供されており、このアプリも非商用で利用しています。
           </li>
           <li>
             海域: Flanders Marine Institute (2018). IHO Sea Areas, version 3（<a href="https://www.marineregions.org/" target="_blank" rel="noopener">Marine Regions</a>、<a href="https://creativecommons.org/licenses/by/4.0/deed.ja" target="_blank" rel="noopener">CC BY 4.0</a>）を日本周辺で切り抜き・簡略化して使用
+          </li>
+          <li>
+            地名（市区町村）: 「市区町村別メッシュ・コード一覧」（総務省統計局、<a href="https://www.stat.go.jp/data/mesh/m_itiran.html" target="_blank" rel="noopener">統計局ホームページ</a>）を加工して作成。1kmメッシュごとの市区町村を <a href="/munis/README.txt" target="_blank">/munis/</a> で配信しています
           </li>
           <li>
             流域サマリの人口: 「国勢調査」2010・2015・2020年 1kmメッシュ（総務省統計局、<a href="https://www.e-stat.go.jp/gis" target="_blank" rel="noopener">e-Stat</a>）を加工して作成

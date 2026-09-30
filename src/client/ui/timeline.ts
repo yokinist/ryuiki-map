@@ -22,7 +22,7 @@ export interface Mouth {
 
 /**
  * 河口の呼び名。「利根川河口（千葉県銚子市）」、川がなければ「千葉県銚子市の海岸」。
- * 住所 at がまだ分からなければ、分かっている部分だけ
+ * 市区町村 at がまだ分からなければ、分かっている部分だけ
  */
 export function mouthName(
   river: string | undefined,
@@ -95,7 +95,7 @@ export function sourceEvents(
   src: SourcePath,
   places: PlaceEvent[],
   origin: Place | null,
-  /** 水源の地区（届く前は undefined、逆ジオコーダで分からなければ null。分かれば見出しにする） */
+  /** 水源の市区町村（届く前は undefined、分からなければ null。分かれば見出しにする） */
   sourcePlace?: Place | null,
   dams: DamOnPath[] = [],
 ): TimelineEvent[] {
@@ -149,7 +149,7 @@ function withRiver(
 }
 
 /**
- * 道のり沿いのダムと地区（出発点の地区は除く）。雨の通り道・水の来た道で共通。
+ * 道のり沿いのダムと市区町村（出発点の市区町村は除く）。雨の通り道・水の来た道で共通。
  * 添え書きはその位置の川の名前と、at で書いた距離
  */
 function alongEvents(

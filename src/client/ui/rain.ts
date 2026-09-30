@@ -67,7 +67,7 @@ export interface RainUi {
   infoToggles: HTMLDetailsElement[];
 }
 
-/** クリックした地点の雨粒を海まで流し（または水源へさかのぼり）、通過した川・地区・ダムを時系列に出す */
+/** クリックした地点の雨粒を海まで流し（または水源へさかのぼり）、通過した川・市区町村・ダムを時系列に出す */
 export class Rain {
   /** 再生のたびに増える。古い再生の非同期処理はこれで打ち切る */
   private token = 0;
@@ -255,14 +255,11 @@ export class Rain {
       origin = p;
       this.prependOrigin(placeName(p));
     });
-    placesAlong(
-      path,
-      () => !alive(),
-      (list) => {
-        places = list;
-        reveal(reached);
-      },
-    );
+    const along = placesAlong(path);
+    along.then((a) => {
+      places = a.places;
+      reveal(reached);
+    });
     // 流路沿いのダム・堰（流域サマリのデータ）。読めなければ出さないだけ
     let dams: DamOnPath[] = [];
     damsAlong(path.pts)
@@ -271,7 +268,7 @@ export class Rain {
         reveal(reached);
       })
       .catch(() => {});
-    // 河口の海は海域データからすぐ分かるが、地名は逆ジオコーダ次第で遅い（混んでいると1件10秒以上）。
+    // 河口の海と地名はどちらも別のファイルを読んでから分かる。
     // 到着は海が分かりしだい出し、河口の地名は分かったら書き足す（undefined = 海を調べ中）
     let mouth: Mouth | null | undefined = path.toSea ? undefined : null;
     let arrived = false;
@@ -283,7 +280,7 @@ export class Rain {
         })
       : Promise.resolve();
     if (path.toSea)
-      Promise.all([placeNearMouth(path, alive), mouthReady]).then(([at]) => {
+      Promise.all([along, mouthReady]).then(([{ last: at }]) => {
         if (!alive() || !at || !mouth) return;
         mouth = { ...mouth, name: mouthName(lastRiver, at) };
         reveal(reached);
@@ -568,7 +565,7 @@ export class Rain {
 
   /**
    * クリック地点から、支流の先の先までたどっていちばん遠い水源へさかのぼる。道のりの線をクリック地点から上流へ伸ばし、
-   * 通る川・流れ込む支流・地区を「水の来た道」に並べる。河口に着いてから呼ぶ（同じ再生の alive を使う）
+   * 通る川・流れ込む支流・市区町村を「水の来た道」に並べる。河口に着いてから呼ぶ（同じ再生の alive を使う）
    */
   private async playSource(
     from: { g: Grid; s: number },
@@ -604,14 +601,13 @@ export class Rain {
             if (alive()) this.ui.progress.textContent = text;
           }).catch(() => null)) ?? coarse); // 引き直しの地形を読めなくても、粗い線で続ける
     if (!alive()) return;
-    const n = src.pts.length;
     this.ui.route.open = false; // 下る旅はたたみ、さかのぼる道のりに目を移す
     this.ui.source.hidden = false;
     this.ui.source.open = true;
 
     let origin: Place | null = null;
     let places: PlaceEvent[] = [];
-    // 水源の地区（未着なら undefined のまま「水源」と出す）
+    // 水源の市区町村（未着なら undefined のまま「水源」と出す）
     let sourcePlace: Place | null | undefined;
     let dams: DamOnPath[] = [];
     let reached = -1;
@@ -630,12 +626,6 @@ export class Rain {
     originPlace.then((p) => {
       origin = p;
     });
-    if (!src.cut)
-      place(src.pts[n - 1]).then((p) => {
-        if (!alive()) return;
-        sourcePlace = p;
-        reveal(reached);
-      });
     // さかのぼる道のり沿いのダム・堰（読めなければ出さないだけ）
     damsAlong(src.pts)
       .then((list) => {
@@ -643,19 +633,11 @@ export class Rain {
         reveal(reached);
       })
       .catch(() => {});
-    // 本筋は1本の川のことが多いので、支流の合流点でも区切って地区を引く
-    const cuts = [
-      ...src.rivers,
-      ...src.tributaries.map((t) => ({ ...t, km: 0 })),
-    ].sort((a, b) => a.step - b.step);
-    placesAlong(
-      { ...src, rivers: cuts },
-      () => !alive(),
-      (list) => {
-        places = list;
-        reveal(reached);
-      },
-    );
+    placesAlong(src).then((a) => {
+      places = a.places;
+      if (!src.cut) sourcePlace = a.last;
+      reveal(reached);
+    });
 
     /** 水源へさかのぼる。開き直したときも最初と同じように、見出し・時系列・進み具合を出し直してたどる */
     const climb = () => {
@@ -762,23 +744,4 @@ function button(
   });
   btn.addEventListener("click", onClick);
   return btn;
-}
-
-/**
- * 河口の住所。河口は川幅の広い水面で住所が返らないことが多いので、
- * 海に入る直前・約0.5km・1km・2km・4km 手前と上流へさかのぼって探す。alive() でなくなったらやめる
- */
-async function placeNearMouth(path: Path, alive: () => boolean) {
-  const n = path.pts.length;
-  const total = path.dist[n - 1];
-  for (const back of [0, 500, 1000, 2000, 4000]) {
-    const i =
-      back === 0
-        ? Math.max(0, n - 2)
-        : path.dist.findLastIndex((d) => d <= total - back);
-    if (i < 0 || !alive()) break;
-    const p = await place(path.pts[i]);
-    if (p?.muni) return p;
-  }
-  return null;
 }

@@ -69,11 +69,9 @@ export const SOURCES = {
   pale: "https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png",
   hillshade:
     "https://cyberjapandata.gsi.go.jp/xyz/hillshademap/{z}/{x}/{y}.png",
-  reverseGeocoder: (lon: number, lat: number) =>
-    `https://mreversegeocoder.gsi.go.jp/reverse-geocoder/LonLatToAddress?lat=${lat}&lon=${lon}`,
-  muni: "https://maps.gsi.go.jp/js/muni.js",
   rivers: "/rivers",
   karte: "/karte",
+  munis: "/munis",
   // 1991〜2020年（気候の平年値と同じ30年）の日降水量
   climate: (lon: number, lat: number) =>
     `https://archive-api.open-meteo.com/v1/archive?latitude=${lat.toFixed(2)}&longitude=${lon.toFixed(2)}&start_date=1991-01-01&end_date=2020-12-31&daily=precipitation_sum&timezone=Asia%2FTokyo`,
@@ -83,12 +81,6 @@ export const SOURCES = {
   glyphs: "/fonts/{fontstack}/{range}.pbf",
 };
 
-/**
- * 地理院の逆ジオコーダへの配慮: 同時接続数。問い合わせるのは川の区間ごとに最大3地点（data/places.ts）。
- * 混んでいると1件10秒以上かかることがあるので、timeoutMs で打ち切る
- */
-export const GEOCODER = { concurrency: 4, timeoutMs: 20_000 };
-
 const LINKS = {
   osmCopyright: "https://www.openstreetmap.org/copyright",
   gsiTiles: "https://maps.gsi.go.jp/development/ichiran.html",
@@ -96,6 +88,6 @@ const LINKS = {
 
 // 河川線は OpenStreetMap（ODbL）。地図に出典を表示し、著作権ページへリンクする
 export const ATTRIBUTION = {
-  gsi: `<a href="${LINKS.gsiTiles}" target="_blank" rel="noopener">地理院タイル</a>（白地図・淡色地図・陰影起伏図・標高タイル）・地理院 逆ジオコーダ`,
+  gsi: `<a href="${LINKS.gsiTiles}" target="_blank" rel="noopener">地理院タイル</a>（白地図・淡色地図・陰影起伏図・標高タイル）`,
   rivers: `河川: <a href="${LINKS.osmCopyright}" target="_blank" rel="noopener">© OpenStreetMap contributors</a>`,
 };

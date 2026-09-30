@@ -4,7 +4,7 @@
 
 ## 仕上げ
 
-変更を終えたら `pnpm typecheck && pnpm check && pnpm test` を通す。`index.html`・`vite.config.ts`・`site.*.ts`・`wrangler.jsonc` を触ったら `pnpm build` も（CI は4つとも走らせる）。計算（`terrain/`・`data/`）・データ（`public/rivers/`・`public/karte/`）・画面の流れを触ったら `pnpm test:e2e`（ブラウザで代表地点の結果を確かめる。数分かかる。CI ではそれらが変わった PR でだけ、PR のプレビュー URL に対して走る）。
+変更を終えたら `pnpm typecheck && pnpm check && pnpm test` を通す。`index.html`・`vite.config.ts`・`site.*.ts`・`wrangler.jsonc` を触ったら `pnpm build` も（CI は4つとも走らせる）。計算（`terrain/`・`data/`）・データ（`public/rivers/`・`public/karte/`・`public/munis/`）・画面の流れを触ったら `pnpm test:e2e`（ブラウザで代表地点の結果を確かめる。数分かかる。CI ではそれらが変わった PR でだけ、PR のプレビュー URL に対して走る）。
 
 ## 公開
 
@@ -40,7 +40,7 @@
 ## データと外部サービス
 
 - `public/rivers/` は `pnpm build:rivers` の生成物だが git で管理する（作り直したらコミットする。古い版のフォルダはスクリプトが消す）。変換のやり直しは `pnpm build:rivers --pack`。引数なしの全国取得は Overpass API に40〜60分問い合わせ続けるので、頼まれたときだけ走らせる。頼まれても、本当に取り直す必要があるか（`--pack` での変換のやり直しで足りないか）を先に確かめる
-- 地理院の逆ジオコーダへの問い合わせは `config.ts` の `GEOCODER`（同時4件）と、`data/places.ts` の間引き（川の区間ごとに最大3地点）の範囲に収める
+- `public/munis/` は `pnpm build:munis` の生成物だが git で管理する（`public/karte/` と同じ）。取得は統計局の CSV 47本（数十秒）で、まとめ直しは `pnpm build:munis --pack`
 - `public/karte/` は `pnpm build:karte` の生成物だが git で管理する（`public/rivers/` と同じ）。まとめ直しは `pnpm build:karte --pack`。全国の取得は e-Stat・WorldCover・Overpass に約1時間問い合わせる（取得済みの分は `.cache/` から再利用する）ので、頼まれたときだけ走らせる。頼まれても、本当に取り直す必要があるか（`--pack` でのまとめ直しで足りないか）を先に確かめる
 - どちらも、作り直しは `.cache/`（git 管理外）にある取得済みの分だけで全体を書き出す。キャッシュが一部しかない状態で走らせると他の地域が消えるので、コミット前に `git status` でファイルが大量に消えていないか確かめる（戻すときは `git restore public/rivers public/karte`）
 - 流域サマリの降水量（Open-Meteo）は、サマリを開いたときだけ1回問い合わせる。地図を動かすたびに問い合わせるような使い方はしない（無料枠は非商用・1日1万回）
