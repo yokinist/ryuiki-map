@@ -81,9 +81,9 @@ jobs:
 
             - src/client/config.ts の定数（WIDE・CLICK_GRID・burnDepth など）を変えると全国の結果が変わる。変えた理由と、代表地点で結果を確かめたか（PR の「確かめたこと」）を求める
             - grids.wides に範囲を足すと、下りの乗り換え（gridAround）で粗い範囲が選ばれる
-            - public/rivers/<版>/・public/karte/<版>/・public/munis/<版>/ の中身は1年キャッシュされる。中身を変えるなら版フォルダを新しくし、latest.json を更新しているか
+            - public/rivers/<版>/・public/karte/<版>/・public/places/<版>/ の中身は1年キャッシュされる。中身を変えるなら版フォルダを新しくし、latest.json を更新しているか
             - 共有 URL の形（?p=経度,緯度、&dir=up）は、旧 URL の転送とすでに配られたリンクが頼っている。変えていないか
-            - /llms.txt・/licenses.md・/rivers/latest.json・/karte/latest.json・/munis/latest.json などの公開パスを変えていないか
+            - /llms.txt・/licenses.md・/rivers/latest.json・/karte/latest.json・/places/latest.json などの公開パスを変えていないか
             - Open-Meteo（サマリを開いたとき1回だけ）の呼び方を、その範囲の外で使っていないか
             - 失敗を .catch で飲み込む新しいコードは、失敗したときに何が起きるか（止まらず進むか）が説明されているか
             - テストの期待値を書き換えていたら、その理由を求める
@@ -96,7 +96,7 @@ jobs:
             - 地図を動かすコードで、easeTo / flyTo に padding を渡していないか。地図を急に動かしていないか
             - 新しい計算に、先に失敗させたテストがあるか（DOM・Worker・通信に依存しない純粋な部分を切り出しているか）
             - コメント・画面の文言・テスト名が日本語か。画面で専門用語を言い換えているか
-            - public/rivers/・public/karte/・public/munis/ のファイルが大量に消えていないか
+            - public/rivers/・public/karte/・public/places/ のファイルが大量に消えていないか
 
             ## 書き方
 

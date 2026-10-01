@@ -6,7 +6,7 @@
   Cache-Control: public, max-age=31536000, immutable
 /karte/:version/*
   Cache-Control: public, max-age=31536000, immutable
-/munis/:version/*
+/places/:version/*
   Cache-Control: public, max-age=31536000, immutable
 # 地図の欧文フォント。中身は変えないので長くキャッシュしてよい
 /fonts/*
@@ -23,9 +23,9 @@
   Cache-Control: public, max-age=300
 /karte/latest.json
   Cache-Control: public, max-age=300
-/munis/latest.json
+/places/latest.json
   Cache-Control: public, max-age=300
-/munis/README.txt
+/places/README.txt
   Content-Type: text/plain; charset=utf-8
 /karte/README.txt
   Content-Type: text/plain; charset=utf-8

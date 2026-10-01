@@ -38,7 +38,7 @@ pnpm build:karte        # 流域サマリ用の人口・土地・ダムのデー
 | `pnpm check` / `pnpm format` | Lint・整形（Biome） |
 | `pnpm build:rivers [タイル…\|--pack]` | 河川データの取得と配信用タイルへの変換。引数なしなら全国のうち未取得の1°タイルだけ取る（途中から再開できる）。`139_36` のように指定するとそれだけ取り直す。どちらも変換は取得済みの全タイルで行う。`--pack` は取得せず変換だけやり直す |
 | `pnpm build:karte [1次メッシュ…\|--pack]` | 流域サマリ用のデータ。e-Stat の国勢調査1kmメッシュ（2010・2015・2020年の人口）、ESA WorldCover（土地の使われ方）、OSM のダム・堰を取得し、1次メッシュ（約80km四方）ごとのファイルにまとめる。途中から再開できる。`5339` のように指定するとそれだけ取る。どちらもまとめは取得済みの全メッシュで行う。`--pack` は取得せずまとめ直す |
-| `pnpm build:munis [--pack]` | 地名（市区町村）の表。統計局の「市区町村別メッシュ・コード一覧」（都道府県ごとの CSV、約11MB）を取得し、1次メッシュごとのファイル（`public/munis/`、約3MB）にまとめる。取得済みの県は `.cache/munis/` から再利用する。`--pack` は取得せずまとめ直す |
+| `pnpm build:places [--pack]` | 地名の格子。e-Stat の「令和2年国勢調査 町丁・字等別境界データ」（都道府県ごとの Shapefile の zip、約320MB）を取得し、1次メッシュごとに約56m×46m のマスへ塗ったファイル（`public/places/`、JSON 約47MB・gzip 約12MB）にする。取得済みの県は `.cache/places/` から再利用する（zip は展開せず `unzip` コマンドで読む）。`--pack` は取得せず作り直す |
 | `pnpm build:seas` | 河口がどの海かを判定する海域データ（`public/seas.json`、約140KB）を作る。1回きりでよい |
 | `pnpm build:og` | 共有時の画像 `public/og.png` を `site.config.ts` の `name`・`stage`・`ogTagline` で描き直す（右の地図は `assets/og-map.png`）。文字は macOS のヒラギノで描く |
 | `pnpm build:hill` | 陰影起伏図で海だけのタイル（404 になる）の一覧（`src/client/map/hill-missing.json`）を作る。問い合わせずに済ませてコンソールのエラーを減らす。1回きりでよい |
@@ -55,12 +55,12 @@ flowchart LR
     worker["流れの計算（Web Worker）<br/>標高と川の線から流れの向き"]
     ui <--> worker
   end
-  cf["Cloudflare<br/>河川・流域サマリのデータ"] --> browser
-  gsi["国土地理院<br/>標高・地図タイル・地名"] --> browser
+  cf["Cloudflare<br/>河川・流域サマリ・地名のデータ"] --> browser
+  gsi["国土地理院<br/>標高・地図タイル"] --> browser
   meteo["Open-Meteo<br/>年間降水量"] --> browser
 ```
 
-- Cloudflare は、事前に作った静的ファイル（全国の河川線を0.5°四方に分けたタイル、流域サマリ用の人口・土地・ダム、海域、フォント）を配るだけ
+- Cloudflare は、事前に作った静的ファイル（全国の河川線を0.5°四方に分けたタイル、流域サマリ用の人口・土地・ダム、地名の格子、海域、フォント）を配るだけ
 - 標高タイル・地図タイル（地理院）は、ブラウザが直接取りに行く。Open-Meteo は流域サマリを開いたときだけ1回問い合わせる
 
 ### 1. 流れの向きを決める
@@ -105,7 +105,7 @@ flowchart TD
 - **吸着**：川のすぐ脇をクリックしても斜面の小さな流れから始まらないよう、周囲4セル（約60m）で集水数が最大のセルに寄せる（`snap`）
 - **たどる**：流れ先を順に追い、海のセルに着いたら終わり。範囲の端に出たら、読み込み済みの別の範囲か、その先の広域グリッドに乗り換えて続ける（最大8回。`terrain/trace.ts` の `traceToSea`）
 - **川の名前**：焼き込むときにセルごとの川も記録しておき、道のりに沿って拾う。今の川が2セル以内に続いていれば、隣の支流に名前を移さない。1km 未満しか沿わない川は合流点のかすりとして捨てる（`data/rivers.ts` の `riversAlong`）
-- **市区町村**：道のりの点ごとに、入る1kmメッシュの市区町村を表で引く。新しい市区町村が2km続いたら、入った所に出す（境界になっている川で岸を行き来するたびに出さないように）。境界をまたぐメッシュでは今いる市区町村のままにし、一度出した市区町村は出し直さない（`data/places.ts` の `muniChanges`）。河口・水源の市区町村は、道のりの最後の陸の点で引く。境界の川や尾根で候補が複数なら、流れてきた側にする
+- **市区町村**：地名の格子（約56m×46m のマスに、マスの中心が入る町丁・字等を塗ったもの。`data/place-grid.ts`）で引く。出発点はその地点のマスで引く。道のりの点は、周り4マス（約200m）以内にある市区町村をみな候補にし、今いる市区町村が候補にあるうちは変えない。新しい市区町村が2km続いたら、入った所に出す（境界になっている川で岸を行き来するたびに出さないように）。一度出した市区町村は出し直さない（`data/places.ts` の `muniChanges`）。河口・水源は、道のりの最後の陸の点で、候補に今いる市区町村があればそれにする（境界の川や尾根の上でも、流れてきた側）
 - **海の名前**：河口の点がどの海域（IHO の海域区分）に入るかで決める。海岸線が粗いので、外れたら20km 以内で一番近い海域にする（`data/seas.ts`）
 - **ダム・堰**：流域サマリ用のダム・堰のデータから、流路から約250m以内のものを拾う（名前のない堰は数が多いので除く。`damsNearPath`）
 
@@ -196,7 +196,8 @@ src/client/              ページ（ブラウザ側）
   data/                  外部データ
     rivers.ts            河川の表示・焼き込み・名前の参照
     river-format.ts      配信用の河川タイルの形式（scripts と共有）
-    places.ts            地名（1kmメッシュごとの市区町村の表を引く）
+    places.ts            地名（町丁・字等の格子を引き、市区町村を出す）
+    place-grid.ts        地名の格子のマスの求め方（作る側と共通）
     seas.ts              河口がどの海か
     karte.ts             流域サマリの集計（範囲の数え直し・メッシュデータの読み込み・降水量の問い合わせ）
     karte-stats.ts       流域サマリの計算（按分・割合。純粋関数）
@@ -216,9 +217,9 @@ src/client/              ページ（ブラウザ側）
     dom.ts               DOM ヘルパー
     format.ts            距離・時間・面積の表示形式
   styles/                tokens.css（デザイントークン）と app.css
-scripts/                 データの作成（河川: build-rivers.ts、流域サマリ: build-karte.ts、市区町村: build-munis.ts、海域: build-seas.ts、陰影の欠けタイル: build-hill-index.ts、共有時の画像: build-og.ts、Overpass API の問い合わせ: overpass.ts）
+scripts/                 データの作成（河川: build-rivers.ts、流域サマリ: build-karte.ts、地名の格子: build-places.ts、海域: build-seas.ts、陰影の欠けタイル: build-hill-index.ts、共有時の画像: build-og.ts、Overpass API の問い合わせ: overpass.ts）
 assets/                  配信しない素材（共有時の画像の右側の地図 og-map.png）
-public/                  静的ファイル（seas.json、_headers、地図の欧文フォント fonts/、アイコン・OGP 画像。河川タイル rivers/・流域サマリ karte/・市区町村 munis/ は生成物だが git で管理する）
+public/                  静的ファイル（seas.json、_headers、地図の欧文フォント fonts/、アイコン・OGP 画像。河川タイル rivers/・流域サマリ karte/・地名の格子 places/ は生成物だが git で管理する）
 site.config.ts           サイト名・説明・URL・構造化データ。index.html の {{キー}} に差し込む
 site.files.ts            robots.txt・sitemap.xml・llms.txt（AI 向けのサイト説明）。ビルド時に書き出す
 wrangler.jsonc           Cloudflare Workers の設定。静的アセットを配るだけで Worker のコードは持たない
@@ -231,12 +232,12 @@ wrangler.jsonc           Cloudflare Workers の設定。静的アセットを配
 
 ## 出典・ライセンス
 
-ソースコードは [MIT License](LICENSE)。地図データは以下のとおりそれぞれ別のライセンスで、MIT は適用されない（リポジトリに入っている `public/rivers/`・`public/karte/`・`public/munis/` も、各フォルダの `README.txt` のライセンスに従う。詳しくは [NOTICE.md](NOTICE.md)）。
+ソースコードは [MIT License](LICENSE)。地図データは以下のとおりそれぞれ別のライセンスで、MIT は適用されない（リポジトリに入っている `public/rivers/`・`public/karte/`・`public/places/` も、各フォルダの `README.txt` のライセンスに従う。詳しくは [NOTICE.md](NOTICE.md)）。
 
 - [地理院タイル](https://maps.gsi.go.jp/development/ichiran.html)（白地図・淡色地図・陰影起伏図・標高タイル）（国土地理院）
 - 河川線と名前: [© OpenStreetMap contributors](https://www.openstreetmap.org/copyright)（[ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/)）
 - 海域: Flanders Marine Institute (2018). IHO Sea Areas, version 3（[Marine Regions](https://www.marineregions.org/)、CC BY 4.0）。日本周辺で切り抜き・簡略化して `public/seas.json` にしている（`pnpm build:seas`）
-- 地名（市区町村）: 「市区町村別メッシュ・コード一覧」（総務省統計局、[統計局ホームページ](https://www.stat.go.jp/data/mesh/m_itiran.html)）。令和2年10月1日現在の市区町村の区域。[公共データ利用規約（第1.0版）](https://www.stat.go.jp/info/riyou.html)に基づき、都道府県名を添えて1次メッシュごとに分けて `public/munis/` にしている（`pnpm build:munis`）
+- 地名（市区町村）: 「令和2年国勢調査 町丁・字等別境界データ」（総務省統計局、[e-Stat](https://www.e-stat.go.jp/gis)）。令和2年10月1日現在の区域・名前。[政府標準利用規約（第2.0版）](https://www.e-stat.go.jp/terms-of-use)に基づき、1次メッシュごとに約56m×46m のマスへ塗って `public/places/` にしている（`pnpm build:places`）
 - 流域サマリの人口: 「国勢調査」2010・2015・2020年 3次メッシュ（1kmメッシュ）人口総数（総務省統計局、[e-Stat](https://www.e-stat.go.jp/gis)）。[政府標準利用規約（第2.0版）](https://www.e-stat.go.jp/terms-of-use)に基づき加工して利用（秘匿値は0として集計）
 - 流域サマリの土地の使われ方: © ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium（[ESA WorldCover](https://esa-worldcover.org/)、CC BY 4.0）。約70mに縮小した版から1kmメッシュごとの分類の割合にしている
 - 流域サマリの年間降水量: [Weather data by Open-Meteo.com](https://open-meteo.com/)（CC BY 4.0。Copernicus Climate Change Service の ERA5 を含む）。表示のたびにブラウザから問い合わせる
@@ -250,7 +251,7 @@ wrangler.jsonc           Cloudflare Workers の設定。静的アセットを配
 | OSM の河川線・名前 | ODbL 1.0 | ①出典表示 ②派生データベースを同じ ODbL で提供 | ①地図右下に「© OpenStreetMap contributors」を著作権ページへのリンク付きで表示（`ATTRIBUTION.rivers`）。OG 画像にも記載 ②変換したタイルを `/rivers/` で公開し、出典・ライセンス・加工内容を書いた `/rivers/README.txt` を添える |
 | OSM のダム・堰 | ODbL 1.0 | 同上 | ①同上 ②`/karte/<版>/dams/` に分けて公開し、`dams/README.txt` を添える。ODbL 以外のデータと同じファイルに混ぜない |
 | 国勢調査 1kmメッシュ人口（e-Stat） | [政府標準利用規約（第2.0版）](https://www.e-stat.go.jp/terms-of-use)（CC BY 4.0 互換） | 出典の記載と、加工した旨の明示 | アプリ内と `/karte/<版>/meshes/README.txt` に「出典：政府統計の総合窓口(e-Stat)」「〜を加工して作成」と記載 |
-| 市区町村別メッシュ・コード一覧（統計局） | [公共データ利用規約（第1.0版）](https://www.stat.go.jp/info/riyou.html)（CC BY 4.0 互換） | 出典の記載と、加工した旨の明示 | アプリ内と `/munis/README.txt` に「「市区町村別メッシュ・コード一覧」（総務省統計局）…を加工して作成」と記載 |
+| 町丁・字等別境界データ（e-Stat） | [政府標準利用規約（第2.0版）](https://www.e-stat.go.jp/terms-of-use)（CC BY 4.0 互換） | 出典の記載と、加工した旨の明示 | アプリ内と `/places/README.txt` に「出典：政府統計の総合窓口(e-Stat)」「「令和2年国勢調査 町丁・字等別境界データ」（総務省統計局）を加工して作成」と記載 |
 | ESA WorldCover | CC BY 4.0 | 所定の出典文言と、改変した旨 | 所定の文言（© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data…）をアプリ内と `meshes/README.txt` に記載し、1kmメッシュに集計した旨も書いている |
 | IHO Sea Areas（Marine Regions） | CC BY 4.0 | 出典表示と、改変した旨 | アプリ内に出典と「日本周辺で切り抜き・簡略化して使用」を記載（`/seas.json`） |
 | Open-Meteo の降水量 | CC BY 4.0。無料 API は非商用のみ | 出典表示。商用なら有料プラン | アプリ内に「Weather data by Open-Meteo.com」をリンク付きで記載。広告・課金のない非商用のアプリ |
