@@ -21,13 +21,14 @@ pnpm install
 pnpm dev
 ```
 
-河川データ（`public/rivers/`）と流域サマリ用のデータ（`public/karte/`）は生成済みのものがリポジトリに入っているので、データを作らずにそのまま動く。
+河川データ（`public/rivers/`）・流域サマリ用のデータ（`public/karte/`）・地名の格子（`public/places/`）は生成済みのものがリポジトリに入っているので、データを作らずにそのまま動く。
 
-データの作り直しは、全国分を取り直すときだけ行う（公開 API に長時間問い合わせる）。スクリプトは手元のキャッシュ（`.cache/`、git 管理外）にある分だけで全体を作り直すので、クローン直後に一部のタイルやメッシュだけ取ると、ほかの地域のデータが消える。消えたら `git restore public/rivers public/karte` で戻せる。
+データの作り直しは、全国分を取り直すときだけ行う（河川と流域サマリは公開 API に長時間問い合わせる）。スクリプトは手元のキャッシュ（`.cache/`、git 管理外）にある分だけで全体を作り直すので、クローン直後に一部のタイルやメッシュだけ取ると、ほかの地域のデータが消える。消えたら `git restore public/rivers public/karte public/places` で戻せる。
 
 ```sh
 pnpm build:rivers       # 全国の河川線を OpenStreetMap（Overpass API）から取り直す（40〜60分）
 pnpm build:karte        # 流域サマリ用の人口・土地・ダムのデータを作り直す（約1時間）
+pnpm build:places       # 地名の格子を e-Stat の町丁・字等別境界データから作り直す（取得を含めて約3分）
 ```
 
 | コマンド | 内容 |
@@ -98,14 +99,14 @@ flowchart TD
   trace --> edge{"計算範囲の端に出た？"}
   edge -- "はい" --> wide["広域グリッドを読み込む<br/>約120mメッシュ・190km四方"]
   wide --> trace
-  edge -- "海に着いた" --> names["川・市区町村・海の名前を付ける<br/>河川線・市区町村の表・海域"]
+  edge -- "海に着いた" --> names["川・地名・海の名前を付ける<br/>河川線・地名の格子・海域"]
   names --> play["雨粒を再生する<br/>流速1m/s の目安・カメラが追う"]
 ```
 
 - **吸着**：川のすぐ脇をクリックしても斜面の小さな流れから始まらないよう、周囲4セル（約60m）で集水数が最大のセルに寄せる（`snap`）
 - **たどる**：流れ先を順に追い、海のセルに着いたら終わり。範囲の端に出たら、読み込み済みの別の範囲か、その先の広域グリッドに乗り換えて続ける（最大8回。`terrain/trace.ts` の `traceToSea`）
 - **川の名前**：焼き込むときにセルごとの川も記録しておき、道のりに沿って拾う。今の川が2セル以内に続いていれば、隣の支流に名前を移さない。1km 未満しか沿わない川は合流点のかすりとして捨てる（`data/rivers.ts` の `riversAlong`）
-- **市区町村**：地名の格子（約56m×46m のマスに、マスの中心が入る町丁・字等を塗ったもの。`data/place-grid.ts`）で引く。出発点はその地点のマスで引く。道のりの点は、周り4マス（約200m）以内にある市区町村をみな候補にし、今いる市区町村が候補にあるうちは変えない。新しい市区町村が2km続いたら、入った所に出す（境界になっている川で岸を行き来するたびに出さないように）。一度出した市区町村は出し直さない（`data/places.ts` の `muniChanges`）。河口・水源は、道のりの最後の陸の点で、候補に今いる市区町村があればそれにする（境界の川や尾根の上でも、流れてきた側）。出発点・河口・水源には町丁・字等の名前も添える（頭の「大字」は外す）。河口・水源は、最後の点を囲む範囲を近い方から広げて（約1kmまで）、選んだ市区町村の名前のある町丁・字等を探す（河口は名前のない水面調査区に入りやすいので）
+- **地名**：地名の格子（約56m×46m のマスに、マスの中心が入る町丁・字等を塗ったもの。`data/place-grid.ts`）で引く。出発点はその地点のマスで引く。道のりの点は、周り4マス（約200m）以内にある市区町村をみな候補にし、今いる市区町村が候補にあるうちは変えない。新しい市区町村が2km続いたら、入った所に出す（境界になっている川で岸を行き来するたびに出さないように）。一度出した市区町村は出し直さない（`data/places.ts` の `muniChanges`）。河口・水源は、道のりの最後の陸の点で、候補に今いる市区町村があればそれにする（境界の川や尾根の上でも、流れてきた側）。出発点・河口・水源には町丁・字等の名前も添える（頭の「大字」は外す）。河口・水源は、最後の点を囲む範囲を近い方から広げて（約1kmまで）、選んだ市区町村の名前のある町丁・字等を探す（河口は名前のない水面調査区に入りやすいので）
 - **海の名前**：河口の点がどの海域（IHO の海域区分）に入るかで決める。海岸線が粗いので、外れたら20km 以内で一番近い海域にする（`data/seas.ts`）
 - **ダム・堰**：流域サマリ用のダム・堰のデータから、流路から約250m以内のものを拾う（名前のない堰は数が多いので除く。`damsNearPath`）
 
@@ -237,7 +238,7 @@ wrangler.jsonc           Cloudflare Workers の設定。静的アセットを配
 - [地理院タイル](https://maps.gsi.go.jp/development/ichiran.html)（白地図・淡色地図・陰影起伏図・標高タイル）（国土地理院）
 - 河川線と名前: [© OpenStreetMap contributors](https://www.openstreetmap.org/copyright)（[ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/)）
 - 海域: Flanders Marine Institute (2018). IHO Sea Areas, version 3（[Marine Regions](https://www.marineregions.org/)、CC BY 4.0）。日本周辺で切り抜き・簡略化して `public/seas.json` にしている（`pnpm build:seas`）
-- 地名（市区町村）: 「令和2年国勢調査 町丁・字等別境界データ」（総務省統計局、[e-Stat](https://www.e-stat.go.jp/gis)）。令和2年10月1日現在の区域・名前。[政府標準利用規約（第2.0版）](https://www.e-stat.go.jp/terms-of-use)に基づき、1次メッシュごとに約56m×46m のマスへ塗って `public/places/` にしている（`pnpm build:places`）
+- 地名（市区町村・町丁・字）: 「令和2年国勢調査 町丁・字等別境界データ」（総務省統計局、[e-Stat](https://www.e-stat.go.jp/gis)）。令和2年10月1日現在の区域・名前。[政府標準利用規約（第2.0版）](https://www.e-stat.go.jp/terms-of-use)に基づき、1次メッシュごとに約56m×46m のマスへ塗って `public/places/` にしている（`pnpm build:places`）
 - 流域サマリの人口: 「国勢調査」2010・2015・2020年 3次メッシュ（1kmメッシュ）人口総数（総務省統計局、[e-Stat](https://www.e-stat.go.jp/gis)）。[政府標準利用規約（第2.0版）](https://www.e-stat.go.jp/terms-of-use)に基づき加工して利用（秘匿値は0として集計）
 - 流域サマリの土地の使われ方: © ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium（[ESA WorldCover](https://esa-worldcover.org/)、CC BY 4.0）。約70mに縮小した版から1kmメッシュごとの分類の割合にしている
 - 流域サマリの年間降水量: [Weather data by Open-Meteo.com](https://open-meteo.com/)（CC BY 4.0。Copernicus Climate Change Service の ERA5 を含む）。表示のたびにブラウザから問い合わせる
