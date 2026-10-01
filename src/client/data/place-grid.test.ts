@@ -81,6 +81,18 @@ describe("nearestArea: マス (i, j) を囲む輪を近い方から（r マス�
   it("そのマス自体が合えば、それを返す", () => {
     expect(nearestArea(row, 2, 0, 1, 3, (k) => k > 0)).toBe(2);
   });
+  it("区域の間の隙間（どこにも入らないマスの斜めの筋）の上でも、周りから区域を返す。区域の中ならそのマス", () => {
+    // 県の境の川: 1 と 2 の区域の間に、幅1マスの 0 が斜めに続く
+    const gap = [
+      [1, 1, 0, 2],
+      [1, 0, 2, 2],
+      [0, 2, 2, 2],
+    ];
+    const any = (k: number) => k > 0;
+    expect(nearestArea((j) => gap[j], 1, 1, 4, 4, any)).toBe(1);
+    expect(nearestArea((j) => gap[j], 0, 0, 4, 4, any)).toBe(1);
+    expect(nearestArea((j) => gap[j], 3, 2, 4, 4, any)).toBe(2);
+  });
   it("r=0 ならそのマスだけを見る", () => {
     expect(nearestArea(row, 1, 1, 0, 3, (k) => k > 0)).toBe(0);
   });
