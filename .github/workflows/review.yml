@@ -14,9 +14,8 @@ permissions:
   contents: read
   issues: read
   pull-requests: write
-  id-token: write
 
-# 同じ PR に push が続いたら古いレビューを止める。レビュー自身の書き込みなど、起動しないコメントは
+# 同じ PR に push が続いたら古いレビューを止める。「@claude review」でないコメント（人のふつうのコメント）は
 # 別のグループにする（同じグループだと、走っているレビューが取り消され、インラインの指摘が投稿されない）
 concurrency:
   group: review-${{ github.event.pull_request.number || github.event.issue.number }}-${{ github.event_name == 'issue_comment' && !contains(github.event.comment.body, '@claude review') && github.run_id || 'review' }}
@@ -62,6 +61,9 @@ jobs:
         with:
           # Claude のサブスクリプション（Max プラン）の枠で動かす。トークンは `claude setup-token` で発行する
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # 書き込みは Claude の GitHub App ではなく、このワークフローのトークン（上の permissions の範囲）で行う。
+          # App のトークンは PR のワークフローが main と同じでないと出ず、review.yml を変える PR やその上に積んだ PR でレビューが止まる
+          github_token: ${{ github.token }}
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
