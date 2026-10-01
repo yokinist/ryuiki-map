@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { muniChanges, placeOf } from "./places";
+import { azaName, muniChanges, placeOf } from "./places";
 
 // 点は 500m おき。数字は点の近くにある市区町村コード（配列は境界の近くで候補が複数、null はどこにも入らない点）
 const run = (...pts: (number | number[] | null)[]) => ({
@@ -54,6 +54,12 @@ describe("muniChanges", () => {
     expect(muniChanges(short.codes, short.dist).last).toBe(3);
     expect(muniChanges([[]], [0]).last).toBeUndefined();
   });
+
+  it("最後の市区町村を引いた点（どこかに入る最後の点）の添字も返す", () => {
+    const moved = run(1, 2, 2, 2, 2, 2, [3, 2], null);
+    expect(muniChanges(moved.codes, moved.dist).lastStep).toBe(6);
+    expect(muniChanges([[]], [0]).lastStep).toBe(-1);
+  });
 });
 
 describe("placeOf", () => {
@@ -65,5 +71,14 @@ describe("placeOf", () => {
       muni: "上川町",
     });
     expect(placeOf(names, 13111)).toBeNull();
+  });
+});
+
+describe("azaName: 町丁・字等の名前を地名に添える形にする", () => {
+  it("頭の「大字」は外す（丁目・字・括弧の中はそのまま）", () => {
+    expect(azaName("大字茂菅")).toBe("茂菅");
+    expect(azaName("羽田空港二丁目")).toBe("羽田空港二丁目");
+    expect(azaName("字与那国")).toBe("字与那国");
+    expect(azaName("五町田中（大字内山）")).toBe("五町田中（大字内山）");
   });
 });

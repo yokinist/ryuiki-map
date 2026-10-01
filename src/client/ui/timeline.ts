@@ -16,19 +16,19 @@ export interface TimelineEvent {
 export interface Mouth {
   /** 流れ込んだ海（太平洋・日本海・瀬戸内海・東シナ海・オホーツク海） */
   sea: string | null;
-  /** 「利根川河口（千葉県銚子市）」 */
+  /** 「利根川河口（千葉県銚子市 川口町一丁目）」 */
   name: string | null;
 }
 
 /**
- * 河口の呼び名。「利根川河口（千葉県銚子市）」、川がなければ「千葉県銚子市の海岸」。
+ * 河口の呼び名。「利根川河口（千葉県銚子市 川口町一丁目）」、川がなければ「千葉県銚子市 川口町一丁目の海岸」。
  * 市区町村 at がまだ分からなければ、分かっている部分だけ
  */
 export function mouthName(
   river: string | undefined,
-  at: Pick<Place, "pref" | "muni"> | null,
+  at: Pick<Place, "pref" | "muni" | "aza"> | null,
 ): string | null {
-  const where = at ? `${at.pref}${at.muni}` : "";
+  const where = at ? placeName(at) : "";
   if (river) return `${river}河口${where ? `（${where}）` : ""}`;
   return where ? `${where}の海岸` : null;
 }

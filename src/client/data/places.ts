@@ -1,20 +1,21 @@
-// 地名（市区町村）。e-Stat の町丁・字等別境界データから作った格子（public/places/。約56m×46m のマス）で、地点が入る町丁・字等を引き、
-// その市区町村を出す
+// 地名。e-Stat の町丁・字等別境界データから作った格子（public/places/。約56m×46m のマス）で、地点が入る町丁・字等を引く。
+// 道のり沿いは市区町村まで、出発点・河口・水源は町丁・字等まで出す
 import { SOURCES } from "../config";
 import type { LngLat } from "../geo";
 import type { Path } from "../terrain/trace";
-import { areasNear, cellOf } from "./place-grid";
+import { areasNear, cellOf, nearestArea } from "./place-grid";
 
-/** 市区町村。key は市区町村コード */
+/** 市区町村。key は市区町村コード。aza は町丁・字等（出発点・河口・水源だけ。分からなければ省く） */
 export interface Place {
   key: string;
   pref: string;
   muni: string;
+  aza?: string;
 }
 
-/** 「群馬県沼田市」 */
-export const placeName = (p: Pick<Place, "pref" | "muni">) =>
-  `${p.pref}${p.muni}`;
+/** 「群馬県沼田市」。町丁・字等が分かれば「群馬県沼田市 岩本町」 */
+export const placeName = (p: Pick<Place, "pref" | "muni" | "aza">) =>
+  `${p.pref}${p.muni}${p.aza ? ` ${p.aza}` : ""}`;
 export interface PlaceEvent extends Place {
   step: number;
 }
@@ -85,6 +86,8 @@ function placeFile(m1: number): Promise<PlaceFile | null> {
 
 /** 道のり沿いでは、この数のマス（約200m）以内にある市区町村をみな候補にする（境界の川で岸を行き来するたびに変えないように） */
 const NEAR_CELLS = 4;
+/** 河口・水源の町丁・字等は、最後の点からこの数のマス（約1km）まで探す（河口は広い水面の上で終わることがある） */
+const END_CELLS = 20;
 
 /** 広げた行（ファイルごとに、使った行だけ覚えておく） */
 const expanded = new WeakMap<PlaceFile, Map<number, Uint16Array>>();
@@ -129,6 +132,9 @@ async function codesAt(pts: LngLat[], r: number): Promise<number[][]> {
   });
 }
 
+/** 町丁・字等の名前を地名に添える形にする。頭の「大字」は外す（丁目・字・括弧の中の地区名はそのまま） */
+export const azaName = (name: string) => name.replace(/^大字/, "");
+
 /** 市区町村コード → 地名 */
 export function placeOf(
   cities: PlaceIndex["cities"],
@@ -139,17 +145,49 @@ export function placeOf(
   return name ? { key, pref: name[0], muni: name[1] } : null;
 }
 
-async function toPlace(code: number | undefined): Promise<Place | null> {
-  return code === undefined ? null : placeOf((await placeIndex()).cities, code);
+/** 市区町村コードと町丁・字等の名前（あれば）→ 地名 */
+async function toPlace(
+  code: number | undefined,
+  name = "",
+): Promise<Place | null> {
+  if (code === undefined) return null;
+  const p = placeOf((await placeIndex()).cities, code);
+  const aza = azaName(name);
+  return p && aza ? { ...p, aza } : p;
 }
 
-/** 地点（出発点）の市区町村。どこにも入らない地点（海の上など）は null */
+/** 地点を囲む輪を近い方から（r マスまで）広げ、accept に合う町丁・字等 [市区町村コード, 名前]。なければ null */
+async function areaNear(
+  [x, y]: LngLat,
+  r: number,
+  accept: (area: [number, string]) => boolean,
+): Promise<[number, string] | null> {
+  // ponytail: codesAt と同じく、1次メッシュの境をまたいだ先は探さない。要るなら隣のファイルも読む
+  const { grid } = await placeIndex();
+  const { m1, i, j } = cellOf(x, y, grid);
+  const file = await placeFile(m1).catch(() => null);
+  if (!file) return null;
+  const k = nearestArea(
+    (row) => rowOf(file, grid, row),
+    i,
+    j,
+    r,
+    grid,
+    (k) => accept(file.areas[k - 1]),
+  );
+  return k ? file.areas[k - 1] : null;
+}
+
+/** 地点（出発点）の市区町村と町丁・字等。どこにも入らない地点（海の上など）は null */
 export async function place(p: LngLat): Promise<Place | null> {
-  const [codes] = await codesAt([p], 0);
-  return toPlace(codes[0]);
+  const area = await areaNear(p, 0, () => true);
+  return area && toPlace(...area);
 }
 
-/** 道のり沿いで入った市区町村（出発点の市区町村は除く）と、道のりの最後（河口・水源）の市区町村 */
+/**
+ * 道のり沿いで入った市区町村（出発点の市区町村は除く）と、道のりの最後（河口・水源）の市区町村と町丁・字等。
+ * 河口・水源の町丁・字等は、最後の点を囲む輪を近い方から広げ、選んだ市区町村のものを探す（境界の川や尾根の上でも、流れてきた側）
+ */
 export async function placesAlong(
   path: Pick<Path, "pts" | "dist">,
 ): Promise<{ places: PlaceEvent[]; last: Place | null }> {
@@ -158,14 +196,23 @@ export async function placesAlong(
     codesAt(path.pts, NEAR_CELLS),
     codesAt(path.pts.slice(0, 1), 0),
   ]);
-  const { changes, last } = muniChanges(codes, path.dist, here[0]);
+  const { changes, last, lastStep } = muniChanges(codes, path.dist, here[0]);
   const places = await Promise.all(changes.map((c) => toPlace(c.code)));
+  const end =
+    last === undefined
+      ? null
+      : // 河口は水面（名前のない水面調査区）に入りやすいので、名前のある町丁・字等を探す
+        await areaNear(
+          path.pts[lastStep],
+          END_CELLS,
+          ([c, name]) => c === last && name !== "",
+        );
   return {
     places: changes.flatMap((c, i) => {
       const p = places[i];
       return p ? [{ ...p, step: c.step }] : [];
     }),
-    last: await toPlace(last),
+    last: await toPlace(last, end?.[1]),
   };
 }
 
@@ -176,13 +223,18 @@ const MIN_RUN_M = 2000;
  * 道のり沿いで市区町村が変わった所。codes[i] は点 i の市区町村コードの候補（どこにも入らない点は空。dist[i] はその点までの距離 m）。
  * changes の step は新しい市区町村に入った点。出発点と、一度出した市区町村は出し直さない。
  * last は最後の点の市区町村。河口・水源は境界の川や尾根にあることが多いので、候補が複数ならそれまでいた側にする。
+ * lastStep はその点（どこかに入る最後の点。なければ -1）。
  * origin は出発点の市区町村（表示と同じく、出発点のマスだけで引いたもの）。省くと最初に見つかった候補
  */
 export function muniChanges(
   codes: number[][],
   dist: number[],
   origin = codes.find((c) => c.length)?.[0] ?? -1,
-): { changes: { step: number; code: number }[]; last: number | undefined } {
+): {
+  changes: { step: number; code: number }[];
+  last: number | undefined;
+  lastStep: number;
+} {
   const out: { step: number; code: number }[] = [];
   let cur = origin;
   // 入りかけの市区町村と、入った点
@@ -206,6 +258,11 @@ export function muniChanges(
       start = -1;
     }
   }
-  const end = codes.findLast((c) => c.length);
-  return { changes: out, last: end && (end.includes(cur) ? cur : next) };
+  const lastStep = codes.findLastIndex((c) => c.length);
+  const end = codes[lastStep];
+  return {
+    changes: out,
+    last: end && (end.includes(cur) ? cur : next),
+    lastStep,
+  };
 }

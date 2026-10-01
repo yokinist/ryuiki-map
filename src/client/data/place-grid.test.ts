@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { areasNear, cellOf, rle, runAt } from "./place-grid";
+import { areasNear, cellOf, nearestArea, rle, runAt } from "./place-grid";
 
 describe("cellOf: 地点が入る1次メッシュと、その中の格子のマス（列 i・行 j。行0が南）", () => {
   it("1次メッシュ 5339（東経139〜140度・北緯35°20′〜36°）の真ん中あたり", () => {
@@ -44,5 +44,44 @@ describe("areasNear: マス (i, j) の周り r マス以内に入っている番
     expect(
       areasNear((j) => (j === 2 ? undefined : grid[j]), 1, 1, 1, 3),
     ).toEqual([1, 2]);
+  });
+});
+
+describe("nearestArea: マス (i, j) を囲む輪を近い方から（r マスまで）広げ、条件に合う番号を探す", () => {
+  const grid = [
+    [1, 1, 2],
+    [1, 0, 2],
+    [3, 3, 2],
+  ];
+  const row = (j: number) => grid[j];
+  it("近い輪と遠い輪の両方に合う番号があれば、近い輪のもの（行の順に先に見えても、遠い輪のものは選ばない）", () => {
+    // 5×5。(0, 0) から1マスの輪に 5、2マスの輪（南の行）に 9
+    const rings = [
+      [0, 0, 9, 0, 0],
+      [0, 5, 0, 0, 0],
+      [0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0],
+    ];
+    expect(
+      nearestArea(
+        (j) => rings[j],
+        0,
+        0,
+        2,
+        5,
+        (k) => k > 0,
+      ),
+    ).toBe(5);
+  });
+  it("条件に合う番号を探す。なければ 0", () => {
+    expect(nearestArea(row, 1, 1, 1, 3, (k) => k === 3)).toBe(3);
+    expect(nearestArea(row, 1, 1, 1, 3, (k) => k === 4)).toBe(0);
+  });
+  it("そのマス自体が合えば、それを返す", () => {
+    expect(nearestArea(row, 2, 0, 1, 3, (k) => k > 0)).toBe(2);
+  });
+  it("r=0 ならそのマスだけを見る", () => {
+    expect(nearestArea(row, 1, 1, 0, 3, (k) => k > 0)).toBe(0);
   });
 });
