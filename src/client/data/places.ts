@@ -178,9 +178,15 @@ async function areaNear(
   return k ? file.areas[k - 1] : null;
 }
 
-/** 地点（出発点）の市区町村と町丁・字等。どこにも入らない地点（海の上など）は null */
+/**
+ * 出発点の町丁・字等。そのマスがどこにも入らないとき（県の境の川などで、元データの区域の間に隙間がある）は、
+ * 周り NEAR_CELLS まで近い輪から探す。表示（place）と道のり沿いの判定（placesAlong）で同じものを使う
+ */
+const originArea = (p: LngLat) => areaNear(p, NEAR_CELLS, () => true);
+
+/** 地点（出発点）の市区町村と町丁・字等。近くにどの区域もない地点（海の上など）は null */
 export async function place(p: LngLat): Promise<Place | null> {
-  const area = await areaNear(p, 0, () => true);
+  const area = await originArea(p);
   return area && toPlace(...area);
 }
 
@@ -191,12 +197,11 @@ export async function place(p: LngLat): Promise<Place | null> {
 export async function placesAlong(
   path: Pick<Path, "pts" | "dist">,
 ): Promise<{ places: PlaceEvent[]; last: Place | null }> {
-  // 出発点は表示（place）と同じく、そのマスだけで引く
-  const [codes, [here]] = await Promise.all([
+  const [codes, here] = await Promise.all([
     codesAt(path.pts, NEAR_CELLS),
-    codesAt(path.pts.slice(0, 1), 0),
+    originArea(path.pts[0]),
   ]);
-  const { changes, last, lastStep } = muniChanges(codes, path.dist, here[0]);
+  const { changes, last, lastStep } = muniChanges(codes, path.dist, here?.[0]);
   const places = await Promise.all(changes.map((c) => toPlace(c.code)));
   const end =
     last === undefined
@@ -224,7 +229,7 @@ const MIN_RUN_M = 2000;
  * changes の step は新しい市区町村に入った点。出発点と、一度出した市区町村は出し直さない。
  * last は最後の点の市区町村。河口・水源は境界の川や尾根にあることが多いので、候補が複数ならそれまでいた側にする。
  * lastStep はその点（どこかに入る最後の点。なければ -1）。
- * origin は出発点の市区町村（表示と同じく、出発点のマスだけで引いたもの）。省くと最初に見つかった候補
+ * origin は出発点の市区町村（表示と同じく originArea で引いたもの）。省くと最初に見つかった候補
  */
 export function muniChanges(
   codes: number[][],
