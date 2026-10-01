@@ -54,3 +54,27 @@ export function areasNear(
   }
   return [...found].sort((a, b) => a - b);
 }
+
+/**
+ * マス (i, j) を囲む輪を1マスずつ広げ（r マスまで）、accept に合う番号を探す。なければ 0。
+ * 同じ輪の中は南の行の西から見て最初のもの（輪の角も辺の真ん中も同じ近さとみなす。河口の地名には足りる）
+ */
+export function nearestArea(
+  row: (j: number) => ArrayLike<number> | undefined,
+  i: number,
+  j: number,
+  r: number,
+  grid: number,
+  accept: (k: number) => boolean,
+): number {
+  for (let d = 0; d <= r; d++)
+    for (let y = Math.max(0, j - d); y <= Math.min(grid - 1, j + d); y++) {
+      const cells = row(y);
+      if (!cells) continue;
+      // 輪の上のマスだけを見る（内側は前の d で見た）
+      const step = y === j - d || y === j + d ? 1 : 2 * d || 1;
+      for (let x = i - d; x <= i + d; x += step)
+        if (x >= 0 && x < grid && cells[x] && accept(cells[x])) return cells[x];
+    }
+  return 0;
+}

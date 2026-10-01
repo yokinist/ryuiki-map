@@ -39,6 +39,14 @@ describe("mouthName", () => {
     expect(mouthName(undefined, choshi)).toBe("千葉県銚子市の海岸");
     expect(mouthName(undefined, null)).toBeNull();
   });
+  it("町丁・字が分かれば、市区町村のあとに添える", () => {
+    expect(mouthName("利根川", { ...choshi, aza: "川口町一丁目" })).toBe(
+      "利根川河口（千葉県銚子市 川口町一丁目）",
+    );
+    expect(mouthName(undefined, { ...choshi, aza: "川口町一丁目" })).toBe(
+      "千葉県銚子市 川口町一丁目の海岸",
+    );
+  });
 });
 
 describe("timelineEvents", () => {
@@ -132,6 +140,10 @@ describe("sourceEvents", () => {
       title: "水源（群馬県片品村）",
       sub: "標高 1,800 m・3.0 km上流・約50分前",
     });
+    const aza = { ...place("10444", "片品村", 3), aza: "東小川" };
+    expect(sourceEvents(source, [], null, aza).at(-1)?.title).toBe(
+      "水源（群馬県片品村 東小川）",
+    );
   });
 
   it("計算範囲の端で切れていたら、水源とは言わない", () => {
