@@ -10,7 +10,7 @@ playwright-report/
 .vite/
 .wrangler
 
-# 河川データ・流域サマリ用データの取得キャッシュ（生成物の public/rivers/・public/karte/・public/places/ は git で管理する）
+# 河川データ・流域サマリ用データ・地名の格子の取得キャッシュ（生成物の public/rivers/・public/karte/・public/places/ は git で管理する）
 .cache/
 
 # エディタ・エージェントの個人設定

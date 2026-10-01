@@ -18,9 +18,9 @@ const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 // 「利用上の注意」「出典・ライセンス」は index.html の同じ見出しと内容を揃える
 const llms = `# ${SITE.name}${SITE.stage}
 
-> 日本のどこかに降った雨が、どの川と市区町村を通って、どの海へたどり着くかを地図上で再生する Web アプリ。流れの向きは国土地理院の標高タイルから推定し、川の名前は OpenStreetMap、市区町村は総務省統計局の市区町村別メッシュ・コード一覧から引く。無料・登録不要。個人が非商用で開発しているオープンソース（MIT License）。
+> 日本のどこかに降った雨が、どの川と市区町村を通って、どの海へたどり着くかを地図上で再生する Web アプリ。流れの向きは国土地理院の標高タイルから推定し、川の名前は OpenStreetMap、地名（市区町村・町丁・字）は総務省統計局の国勢調査の町丁・字等別境界データから引く。無料・登録不要。個人が非商用で開発しているオープンソース（MIT License）。
 
-Ryuiki Tansaku Map ("ryuiki" means watershed / drainage basin, "tansaku" means exploration): click anywhere in Japan to follow where the rain that falls there flows — through which rivers and villages, and into which sea. Flow directions are estimated from GSI elevation tiles; river names come from OpenStreetMap.
+Ryuiki Tansaku Map ("ryuiki" means watershed / drainage basin, "tansaku" means exploration): click anywhere in Japan to follow where the rain that falls there flows — through which rivers and villages, and into which sea. Flow directions are estimated from GSI elevation tiles; river names come from OpenStreetMap; place names come from the 2020 Census small-area boundaries (Statistics Bureau of Japan).
 
 ## できること
 
@@ -51,7 +51,7 @@ Ryuiki Tansaku Map ("ryuiki" means watershed / drainage basin, "tansaku" means e
 - [地理院タイル](https://maps.gsi.go.jp/development/ichiran.html)（白地図・淡色地図・陰影起伏図・標高タイル）（国土地理院）
 - 河川線と名前: [© OpenStreetMap contributors](https://www.openstreetmap.org/copyright)（ODbL 1.0）。変換した河川タイルも ODbL で提供: ${SITE.url}rivers/README.txt 。日本の河川線の多くは国土数値情報（河川データ、国土交通省）を2012年に同省の了承を得て OpenStreetMap に取り込んだもの。国土数値情報の河川データは現在「非商用」の条件で提供されており、このアプリも非商用で利用している
 - 海域: Flanders Marine Institute (2018). IHO Sea Areas, version 3（[Marine Regions](https://www.marineregions.org/)、CC BY 4.0）
-- 地名（市区町村）: 「令和2年国勢調査 町丁・字等別境界データ」（総務省統計局、e-Stat https://www.e-stat.go.jp/gis ）を加工して作成。配信: ${SITE.url}places/README.txt
+- 地名（市区町村・町丁・字）: 「令和2年国勢調査 町丁・字等別境界データ」（総務省統計局、e-Stat https://www.e-stat.go.jp/gis ）を加工して作成。配信: ${SITE.url}places/README.txt
 - 流域サマリの人口: 「国勢調査」2010・2015・2020年 1kmメッシュ（総務省統計局、[e-Stat](https://www.e-stat.go.jp/gis)）を加工して作成
 - 流域サマリの土地の使われ方: © ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium（CC BY 4.0）
 - 流域サマリの年間降水量: [Weather data by Open-Meteo.com](https://open-meteo.com/)（CC BY 4.0、ERA5）
