@@ -71,7 +71,7 @@ export const SOURCES = {
     "https://cyberjapandata.gsi.go.jp/xyz/hillshademap/{z}/{x}/{y}.png",
   rivers: "/rivers",
   karte: "/karte",
-  munis: "/munis",
+  places: "/places",
   // 1991〜2020年（気候の平年値と同じ30年）の日降水量
   climate: (lon: number, lat: number) =>
     `https://archive-api.open-meteo.com/v1/archive?latitude=${lat.toFixed(2)}&longitude=${lon.toFixed(2)}&start_date=1991-01-01&end_date=2020-12-31&daily=precipitation_sum&timezone=Asia%2FTokyo`,

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { muniChanges, placeOf } from "./places";
 
-// 点は 500m おき。数字は点が入るメッシュの市区町村コード（配列は境界をまたぐメッシュ、null は表で見つからない点）
+// 点は 500m おき。数字は点の近くにある市区町村コード（配列は境界の近くで候補が複数、null はどこにも入らない点）
 const run = (...pts: (number | number[] | null)[]) => ({
   codes: pts.map((p) => (p === null ? [] : [p].flat())),
   dist: pts.map((_, i) => i * 500),
@@ -23,7 +23,7 @@ describe("muniChanges", () => {
     expect(muniChanges(codes, dist).changes).toEqual([{ step: 2, code: 3 }]);
   });
 
-  it("表で見つからない点（湖の上など）は飛ばし、続きは切らない", () => {
+  it("どこにも入らない点（湖の上など）は飛ばし、続きは切らない", () => {
     const { codes, dist } = run(null, 1, 2, null, 2, null, 2, 2);
     expect(muniChanges(codes, dist).changes).toEqual([{ step: 2, code: 2 }]);
   });
@@ -33,12 +33,18 @@ describe("muniChanges", () => {
     expect(muniChanges(codes, dist).changes).toEqual([{ step: 1, code: 2 }]);
   });
 
-  it("境界をまたぐメッシュ（候補が複数）では、今いる市区町村のままにする", () => {
+  it("境界の近く（候補が複数）では、今いる市区町村のままにする", () => {
     const { codes, dist } = run(1, [1, 2], [1, 2], [2, 1], [1, 2], [1, 2]);
     expect(muniChanges(codes, dist).changes).toEqual([]);
   });
 
-  it("最後の市区町村（河口・水源）は、境界をまたぐメッシュならそれまでいた市区町村", () => {
+  it("出発点の市区町村を渡せば、出発点に候補が複数あってもそこから始める", () => {
+    // 出発点は 2 の中で、1 との境界の近く。そこから 1 へ流れ込む
+    const { codes, dist } = run([1, 2], 1, 1, 1, 1, 1);
+    expect(muniChanges(codes, dist, 2).changes).toEqual([{ step: 1, code: 1 }]);
+  });
+
+  it("最後の市区町村（河口・水源）は、候補が複数ならそれまでいた市区町村", () => {
     const stay = run(1, 1, [1, 3]);
     expect(muniChanges(stay.codes, stay.dist).last).toBe(1);
     const moved = run(1, 2, 2, 2, 2, 2, [3, 2], null);
