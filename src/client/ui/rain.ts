@@ -15,10 +15,8 @@ import {
 import { seaAt } from "../data/seas";
 import { type WaterOnPath, waterAlong } from "../data/water";
 import type { LngLat } from "../geo";
-import { maskRect, paint, setData, setImage } from "../map/overlays";
-import { pixel } from "../map/theme";
 import { type Grid, gridAt } from "../terrain/grid";
-import { snap, upstream } from "../terrain/hydro";
+import { snap } from "../terrain/hydro";
 import {
   type Path,
   refineSource,
@@ -42,9 +40,9 @@ import {
   type SourcePath,
   sourceEvents,
   Timeline,
-  type TimelineEvent,
   timelineEvents,
 } from "./timeline";
+import { TrailLayers } from "./trail-layers";
 import { type Trail, trailView } from "./trail-state";
 
 export interface RainUi {
@@ -74,9 +72,7 @@ export interface RainUi {
 export class Rain {
   /** 再生のたびに増える。古い再生の非同期処理はこれで打ち切る */
   private token = 0;
-  private readonly drop = new maplibregl.Marker({
-    element: el("div", { className: "drop", ariaHidden: "true" }), // 地図上の飾り。内容はパネルが伝える
-  });
+  private readonly layers: TrailLayers;
   private readonly timeline: Timeline;
   private readonly sourceTimeline: Timeline;
   private camera: FollowCamera | null = null;
@@ -103,6 +99,7 @@ export class Rain {
     private readonly onTrail: (kind: Trail) => void,
   ) {
     this.panel = new JourneyPanel(ui);
+    this.layers = new TrailLayers(map);
     this.timeline = new Timeline(ui.timeline);
     this.sourceTimeline = new Timeline(ui.sourceTimeline);
     // 2つの欄は name で束ねてあり、片方を開くともう片方は閉じる。開いた方の道のりをもう一度追う
@@ -114,7 +111,7 @@ export class Rain {
 
   stop() {
     this.token++;
-    this.drop.remove();
+    this.layers.removeDrop();
     this.camera?.dispose();
   }
 
@@ -122,47 +119,7 @@ export class Rain {
     this.stop();
     this.ui.result.hidden = true;
     delete this.ui.panel.dataset.state;
-    this.clearOverlays();
-  }
-
-  private clearOverlays() {
-    setImage(this.map, "basin");
-    setData(this.map, "downstream");
-    setData(this.map, "upstream");
-    setData(this.map, "confluences");
-  }
-
-  /** 雨粒の印を k 番目の点へ動かし、道のりの線をそこまで伸ばす */
-  private advance(layer: "downstream" | "upstream", pts: LngLat[], k: number) {
-    this.drop.setLngLat(pts[k]);
-    setData(this.map, layer, {
-      type: "LineString",
-      coordinates: pts.slice(0, k + 1),
-    });
-  }
-
-  /**
-   * 時系列に出た項目のうち、川の合流・支流の合流・ダムを地図にも印と名前で置く（雨の通り道・水の来た道で共通）。
-   * 出発点自体（最初の川。id "r0"）は雨粒の印と重なるので出さない。ダムは「を通る」を除いた名前だけ
-   */
-  private showConfluences(events: TimelineEvent[], pts: LngLat[]) {
-    const marks = events.filter(
-      (ev) =>
-        (ev.kind === "river" && ev.id !== "r0") ||
-        ev.kind === "dam" ||
-        ev.kind === "branch",
-    );
-    setData(this.map, "confluences", {
-      type: "FeatureCollection",
-      features: marks.map((ev) => ({
-        type: "Feature",
-        properties: {
-          kind: ev.kind,
-          label: ev.kind === "dam" ? ev.title.replace(/を通る$/, "") : ev.title,
-        },
-        geometry: { type: "Point", coordinates: pts[ev.step] },
-      })),
-    });
+    this.layers.clear();
   }
 
   /**
@@ -172,12 +129,12 @@ export class Rain {
   prepare(p: LngLat, text = "この辺りの地形を読み込み中…") {
     this.token++;
     this.camera?.dispose();
-    this.drop.setLngLat(p).addTo(this.map);
+    this.layers.placeDrop(p);
     this.openPanel("");
     this.closeInfo();
     this.ui.route.open = true;
     this.panel.searching(text);
-    this.clearOverlays();
+    this.layers.clear();
   }
 
   /** 結果欄を開き、前の雨の時系列・まとめを消す */
@@ -216,7 +173,7 @@ export class Rain {
     this.prepare(g.lngLat(s), "雨の流れを計算中…");
     const token = this.token;
     const alive = () => token === this.token;
-    setData(this.map, "hover");
+    this.layers.clearHover();
     const path = await traceToSea(g, s, { say: this.loading });
     if (!alive()) return; // 計算中に別の地点がクリックされた
     this.status(
@@ -224,7 +181,7 @@ export class Rain {
     );
     this.onStart(path.pts[0]);
 
-    this.showBasin(g, s, alive);
+    this.layers.showBasin(g, s, alive);
     this.resetPanel(`標高 ${Math.round(g.elev[s]).toLocaleString()} m`);
 
     // 地名は非同期で届くので、届いたら到達済みの分を出す
@@ -291,10 +248,10 @@ export class Rain {
         water,
       ).filter((ev) => ev.step <= k);
       this.timeline.add(events);
-      this.showConfluences(events, path.pts);
+      this.layers.showConfluences(events, path.pts);
     };
 
-    this.drop.setLngLat(path.pts[0]).addTo(this.map);
+    this.layers.placeDrop(path.pts[0]);
     /** 河口まで下る。開き直したときも最初と同じように、見出し・時系列・進み具合を出し直してたどる */
     const descend = (onEnd: () => unknown) => {
       arrived = false; // たどっている間に河口の地名が届いても、見出しを結論にしない
@@ -306,7 +263,7 @@ export class Rain {
         alive,
         (k) => {
           reached = k;
-          this.advance("downstream", path.pts, k);
+          this.layers.advance("downstream", path.pts, k);
           reveal(k);
           this.panel.progress(path, k, "route");
         },
@@ -334,7 +291,7 @@ export class Rain {
             if (!alive() || this.showing !== "route") return;
             const basin = await prefetchBasin({ g, s });
             if (alive() && this.showing === "route" && basin && basin.g !== g)
-              this.showBasin(basin.g, basin.s, alive, basin.up);
+              this.layers.showBasin(basin.g, basin.s, alive, basin.up);
           });
       });
     if (up) {
@@ -371,7 +328,7 @@ export class Rain {
     this.closeInfo();
     const view = trailView(kind);
     // 合流点・支流・ダムの印は reveal() 側で出し直す
-    setData(this.map, view.clearLine);
+    this.layers.clearLine(view.clearLine);
     if (this.upButton) this.upButton.hidden = !view.showUp;
     if (this.downButton) this.downButton.hidden = !view.showDown;
     this.camera?.dispose();
@@ -399,22 +356,6 @@ export class Rain {
         });
     };
     requestAnimationFrame(frame);
-  }
-
-  /** クリック地点の集水域を地図に塗る（数値は流域サマリで見る） */
-  private showBasin(
-    g: Grid,
-    s: number,
-    alive: () => boolean,
-    up = upstream(g.down, g.order, s),
-  ) {
-    const fill = pixel("--color-basin", 0xa8);
-    const rect = maskRect(g, up);
-    if (rect)
-      paint(g, (c) => (up[c] ? fill : 0), rect).then((img) => {
-        if (alive()) setImage(this.map, "basin", img, { fade: true });
-        else URL.revokeObjectURL(img.url);
-      });
   }
 
   private resetPanel(origin: string) {
@@ -499,7 +440,8 @@ export class Rain {
     // 待つ間に「雨の通り道」を開き直して下り直していたら、さかのぼりで割り込まない
     if (!alive() || !basin || this.showing !== "source") return;
     // クリック時の塗りは雨をたどった範囲の中だけなので、より広い範囲で数え直せたら塗り直す
-    if (basin.g !== from.g) this.showBasin(basin.g, basin.s, alive, basin.up);
+    if (basin.g !== from.g)
+      this.layers.showBasin(basin.g, basin.s, alive, basin.up);
     // 雨をたどった範囲より粗い範囲で水源を探したときは、水源の位置だけ使い、線は細かい範囲で引き直す。
     // クリック地点のそばを通らなければ、粗い道のりのまま出す
     const coarse = traceToSource(basin.g, basin.s, basin.truncated);
@@ -532,7 +474,7 @@ export class Rain {
         water,
       ).filter((ev) => ev.step <= k);
       this.sourceTimeline.add(events);
-      this.showConfluences(events, src.pts);
+      this.layers.showConfluences(events, src.pts);
     };
     originPlace.then((p) => {
       origin = p;
@@ -568,7 +510,7 @@ export class Rain {
         (k) => {
           reached = k;
           // 雨粒の印も一緒にさかのぼらせ、河口と同じように水源に印が残るようにする
-          this.advance("upstream", src.pts, k);
+          this.layers.advance("upstream", src.pts, k);
           reveal(k);
           this.panel.progress(src, k, "source");
         },
