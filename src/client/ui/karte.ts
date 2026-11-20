@@ -43,8 +43,8 @@ interface Entry {
   along?: number[] | null;
   /** 年間降水量 mm。問い合わせ中は undefined、取れなければ null */
   rain?: number | null;
-  /** すぐ下流の水質の測定点と、そこまでの流路長 m。読み込み中は undefined、近くになければ null */
-  water?: { station: WaterOnPath; m: number } | null;
+  /** すぐ下流の水質の測定点と、そこまでの流路長 m。読み込み中は undefined、近くになければ null、読めなければ "error" */
+  water?: { station: WaterOnPath; m: number } | null | "error";
 }
 
 let entry: Entry | null = null;
@@ -123,12 +123,16 @@ export async function openKarte(
   };
   const e = entry;
 
+  // 読めなかったときは「測定点がない」と言わないよう、ないときと分ける（降水量の「取得できませんでした」と同じ）
   stationsAlong(path)
-    .then((list) => nearestStation(list, path.dist))
-    .catch(() => null)
-    .then((station) => {
+    .then((list) => {
+      const station = nearestStation(list, path.dist);
+      return station && { station, m: path.dist[station.step] };
+    })
+    .catch(() => "error" as const)
+    .then((water) => {
       if (!entry || entry !== e) return;
-      e.water = station && { station, m: path.dist[station.step] };
+      e.water = water;
       render();
     });
 
@@ -190,6 +194,8 @@ const WATER_HELP =
 
 function waterRow(e: Entry) {
   if (e.water === undefined) return loadingRow("水のきれいさ");
+  if (e.water === "error")
+    return row("水のきれいさ", sub("取得できませんでした"));
   if (e.water === null)
     return row("水のきれいさ", sub("下流20km 以内に測定点がありません"));
   const { station: w, m } = e.water;
