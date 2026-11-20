@@ -746,7 +746,7 @@ function karteButton(
   const river = path.rivers[0]?.step === 0 ? path.rivers[0].name : undefined;
   const down = { m: path.dist[path.dist.length - 1], toSea: path.toSea };
   return button("primary", "流域サマリを見る", () =>
-    openKarte(from, river, originPlace, down, path.pts),
+    openKarte(from, river, originPlace, down, path),
   );
 }
 
