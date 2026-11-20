@@ -153,15 +153,16 @@ export interface DamOnPath {
  * 流路 pts から maxM 以内にあるダム・堰を、流路の順に返す。
  * 名前のない堰は数が多く時系列が埋まるので除く。1つのダムが重ねて登録されていることがあるので、同じ名前は最初の1つにまとめる
  */
-export function damsNearPath(
-  pts: LngLat[],
-  dams: DamRow[],
-  maxM = 250,
-): DamOnPath[] {
-  if (!pts.length) return [];
-  // 流路を囲む範囲の外のダムは、点ごとの距離を測る前に除く
+/**
+ * 流路 pts で、地点 (x, y) からいちばん近い点の添字を返す関数。maxM より遠ければ -1。
+ * kx は流路の中ほどの緯度での経度1度あたりの m
+ */
+export function nearestOnPath(pts: LngLat[], maxM: number) {
+  // 流路を囲む範囲の外の地点は、点ごとの距離を測る前に除く
   const margin = maxM / 90_000; // 度。緯度1度 ≈ 111km なので少し広めに
-  let [w, s, e, n] = [pts[0][0], pts[0][1], pts[0][0], pts[0][1]];
+  let [w, s, e, n] = pts.length
+    ? [pts[0][0], pts[0][1], pts[0][0], pts[0][1]]
+    : [0, 0, -1, -1];
   for (const [x, y] of pts) {
     w = Math.min(w, x);
     e = Math.max(e, x);
@@ -169,12 +170,9 @@ export function damsNearPath(
     n = Math.max(n, y);
   }
   const kx = 111_320 * Math.cos((((s + n) / 2) * Math.PI) / 180);
-  const found: (DamOnPath & { x: number; y: number })[] = [];
-  const seen = new Set<string>();
-  for (const [x, y, kind, name] of dams) {
-    if (kind === 1 && !name) continue;
+  const step = (x: number, y: number) => {
     if (x < w - margin || x > e + margin || y < s - margin || y > n + margin)
-      continue;
+      return -1;
     let best = -1;
     let bestD = maxM * maxM;
     for (let i = 0; i < pts.length; i++) {
@@ -186,6 +184,23 @@ export function damsNearPath(
         best = i;
       }
     }
+    return best;
+  };
+  return { step, kx };
+}
+
+export function damsNearPath(
+  pts: LngLat[],
+  dams: DamRow[],
+  maxM = 250,
+): DamOnPath[] {
+  if (!pts.length) return [];
+  const { step, kx } = nearestOnPath(pts, maxM);
+  const found: (DamOnPath & { x: number; y: number })[] = [];
+  const seen = new Set<string>();
+  for (const [x, y, kind, name] of dams) {
+    if (kind === 1 && !name) continue;
+    const best = step(x, y);
     if (best < 0) continue;
     const key = name || `${kind}@${best}`;
     if (seen.has(key)) continue;
