@@ -359,6 +359,45 @@ p {
 .meter .meter__on {
   background: var(--color-water);
 }
+/* 流域サマリの BOD の推移。線と点は川の色、文字は本文の淡い色、格子は境目の色 */
+.trend-chart {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  height: auto;
+  margin: var(--space-2) 0 var(--space-1);
+  overflow: visible;
+}
+.trend-chart__grid {
+  stroke: var(--color-border);
+  stroke-width: 1;
+}
+.trend-chart__line {
+  fill: none;
+  stroke: var(--color-water);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.trend-chart__dot {
+  fill: var(--color-water);
+  stroke: var(--color-surface);
+  stroke-width: 2;
+}
+.trend-chart__axis,
+.trend-chart__year,
+.trend-chart__value {
+  fill: var(--color-ink-muted);
+  font-size: var(--font-size-xs);
+}
+.trend-chart__year,
+.trend-chart__value {
+  text-anchor: middle;
+  font-variant-numeric: tabular-nums;
+}
+.trend-chart__value {
+  fill: var(--color-ink);
+}
 /* 推移の一言と、その頭に置く小さな折れ線（線は川の色、文字は本文の淡い色） */
 .timeline__trend {
   display: flex;

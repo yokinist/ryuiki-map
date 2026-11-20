@@ -2,6 +2,14 @@
 import { type Karte, karteAt, landAlong, precipitation } from "../data/karte";
 import { CENSUS_YEARS, LAND } from "../data/karte-format";
 import { type Place, placeName } from "../data/places";
+import {
+  nearestStation,
+  stationsAlong,
+  trendNote,
+  WATER_SCORE_MAX,
+  type WaterOnPath,
+  waterScore,
+} from "../data/water";
 import type { LngLat } from "../geo";
 import { tokenMs } from "../map/theme";
 import type { Grid } from "../terrain/grid";
@@ -35,6 +43,8 @@ interface Entry {
   along?: number[] | null;
   /** 年間降水量 mm。問い合わせ中は undefined、取れなければ null */
   rain?: number | null;
+  /** すぐ下流の水質の測定点と、そこまでの流路長 m。読み込み中は undefined、近くになければ null */
+  water?: { station: WaterOnPath; m: number } | null;
 }
 
 let entry: Entry | null = null;
@@ -88,7 +98,11 @@ export async function openKarte(
   river: string | undefined,
   place: Promise<Place | null>,
   down: Downstream,
-  pts: LngLat[],
+  path: {
+    pts: LngLat[];
+    dist: number[];
+    rivers: { name: string; step: number }[];
+  },
 ) {
   const outlet = from.g.lngLat(from.s);
   if (entry && sameOutlet(entry.outlet, outlet)) {
@@ -105,8 +119,18 @@ export async function openKarte(
     karte: undefined,
     along: undefined,
     rain: undefined,
+    water: undefined,
   };
   const e = entry;
+
+  stationsAlong(path)
+    .then((list) => nearestStation(list, path.dist))
+    .catch(() => null)
+    .then((station) => {
+      if (!entry || entry !== e) return;
+      e.water = station && { station, m: path.dist[station.step] };
+      render();
+    });
 
   place.then((p) => {
     if (!entry || entry !== e || !p) return;
@@ -116,7 +140,7 @@ export async function openKarte(
   });
 
   // 数値は全部そろってから一度に出す（途中は全行を読み込み中の帯にする）
-  Promise.all([karteAt(from), landAlong(pts)]).then(async ([k, along]) => {
+  Promise.all([karteAt(from), landAlong(path.pts)]).then(async ([k, along]) => {
     if (!entry || entry !== e) return;
     e.karte = k;
     e.along = along;
@@ -160,6 +184,112 @@ const LENGTH_HELP =
   "この地点から河口まで、雨の通り道に沿った距離です。標高から計算した目安です。";
 const LAND_PATH_HELP =
   "この地点から河口まで、雨の通り道が通る1kmメッシュごとの土地の使われ方（ESA WorldCover）を、通過距離の長さで加重平均した目安です。";
+
+const WATER_HELP =
+  "環境省の公共用水域水質測定結果のうち、水のよごれの目安（BOD、小さいほどきれい）の年平均です。言葉は河川の環境基準の類型に合わせ、メーターと図は BOD を10段に分けたものです（上・多いほどきれい）。この地点から下流へ20km 以内で、いちばん近い測定点の値です。国が基準を満たしたかの判定は年平均ではなく75%値を使うので、ここでの言葉は国の判定より甘めになることがあります。";
+
+function waterRow(e: Entry) {
+  if (e.water === undefined) return loadingRow("水のきれいさ");
+  if (e.water === null)
+    return row("水のきれいさ", sub("下流20km 以内に測定点がありません"));
+  const { station: w, m } = e.water;
+  const where = m < 100 ? "すぐそば" : `${km(m)}下流`;
+  const note = trendNote(w.history);
+  return helpRow(
+    "水のきれいさ",
+    WATER_HELP,
+    big(w.label),
+    sub(`${where}の${w.name}で測定・BOD ${w.bod}（${w.year}年度の平均）`),
+    ...(note
+      ? [trendChart(w.history), sub(`${note.text}（${note.values}）`)]
+      : []),
+  );
+}
+
+/**
+ * BOD の推移の折れ線。横は年度、縦はきれいさ（メーターと同じ10段。上ほどきれい）。
+ * 値は最初と最新の点だけに添え、ほかは点にカーソルを当てると出る
+ */
+function trendChart(history: WaterOnPath["history"]) {
+  const W = 280;
+  const H = 112;
+  const pad = { l: 40, r: 16, t: 18, b: 20 };
+  const y0 = history[0].year;
+  const span = history[history.length - 1].year - y0 || 1;
+  const x = (year: number) =>
+    pad.l + ((year - y0) / span) * (W - pad.l - pad.r);
+  const y = (bod: number) =>
+    pad.t +
+    (1 - (waterScore(bod) - 1) / (WATER_SCORE_MAX - 1)) * (H - pad.t - pad.b);
+  const NS = "http://www.w3.org/2000/svg";
+  const make = (
+    tag: string,
+    attrs: Record<string, string | number>,
+    text?: string,
+  ) => {
+    const node = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, String(v));
+    if (text) node.textContent = text;
+    return node;
+  };
+  const svg = make("svg", {
+    viewBox: `0 0 ${W} ${H}`,
+    class: "trend-chart",
+    role: "img",
+    "aria-label": `BOD の推移: ${history.map((h) => `${h.year}年度 ${h.bod}`).join("、")}`,
+  });
+  // 縦の向きを言葉で示す（上がきれい）。目盛りの数字は10段の番号で意味が薄いので出さない
+  const top = y(0);
+  const bottom = pad.t + (H - pad.t - pad.b);
+  svg.append(
+    make("line", {
+      x1: pad.l,
+      x2: W - pad.r,
+      y1: top,
+      y2: top,
+      class: "trend-chart__grid",
+    }),
+    make("line", {
+      x1: pad.l,
+      x2: W - pad.r,
+      y1: bottom,
+      y2: bottom,
+      class: "trend-chart__grid",
+    }),
+    make("text", { x: 0, y: top + 4, class: "trend-chart__axis" }, "きれい"),
+    make("text", { x: 0, y: bottom + 4, class: "trend-chart__axis" }, "よごれ"),
+    make("polyline", {
+      points: history.map((h) => `${x(h.year)},${y(h.bod)}`).join(" "),
+      class: "trend-chart__line",
+    }),
+  );
+  history.forEach((h, i) => {
+    const dot = make("circle", {
+      cx: x(h.year),
+      cy: y(h.bod),
+      r: 4,
+      class: "trend-chart__dot",
+    });
+    dot.append(make("title", {}, `${h.year}年度 BOD ${h.bod}`));
+    svg.append(
+      dot,
+      make(
+        "text",
+        { x: x(h.year), y: H - 4, class: "trend-chart__year" },
+        String(h.year),
+      ),
+    );
+    if (i === 0 || i === history.length - 1)
+      svg.append(
+        make(
+          "text",
+          { x: x(h.year), y: y(h.bod) - 8, class: "trend-chart__value" },
+          String(h.bod),
+        ),
+      );
+  });
+  return svg;
+}
 
 const big = (text: string) =>
   el("b", { className: "karte-big", textContent: text });
@@ -321,6 +451,7 @@ function card(e: Entry) {
       e.karte === undefined ? loadingRow("河口までの長さ") : mouthLengthRow(e),
       pathLandRow(e),
     ),
+    group("この地点の水", waterRow(e)),
     group("この地点より上流", ...upstreamRows(e)),
   );
 }
