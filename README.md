@@ -23,7 +23,7 @@ pnpm dev
 
 河川データ（`public/rivers/`）・流域サマリ用のデータ（`public/karte/`）・地名の格子（`public/places/`）・水質の表（`public/water/`）は生成済みのものがリポジトリに入っているので、データを作らずにそのまま動く。
 
-データの作り直しは、全国分を取り直すときだけ行う（河川と流域サマリは公開 API に長時間問い合わせる）。スクリプトは手元のキャッシュ（`.cache/`、git 管理外）にある分だけで全体を作り直すので、クローン直後に一部のタイルやメッシュだけ取ると、ほかの地域のデータが消える。消えたら `git restore public/rivers public/karte public/places` で戻せる。
+データの作り直しは、全国分を取り直すときだけ行う（河川と流域サマリは公開 API に長時間問い合わせる）。スクリプトは手元のキャッシュ（`.cache/`、git 管理外）にある分だけで全体を作り直すので、クローン直後に一部のタイルやメッシュだけ取ると、ほかの地域のデータが消える。消えたら `git restore public/rivers public/karte public/places public/water` で戻せる。
 
 ```sh
 pnpm build:rivers       # 全国の河川線を OpenStreetMap（Overpass API）から取り直す（40〜60分）
