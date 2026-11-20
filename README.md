@@ -211,6 +211,7 @@ src/client/              ページ（ブラウザ側）
     sea-tiles.ts         海だけのタイルの一覧（hill-missing.json）の引き方
   ui/                    画面
     rain.ts              雨粒の再生と、時系列・まとめ・上流へのさかのぼりの表示
+    trail-state.ts       見ている道のり（下り・上り）から決まるボタン・消す線・共有URLの dir（純粋関数）
     karte.ts             流域サマリの画面（カードを並べて比べる）
     camera.ts            雨粒を追うカメラ
     layout.ts            パネルに隠れない地図の範囲の計算

@@ -44,6 +44,7 @@ import {
   type TimelineEvent,
   timelineEvents,
 } from "./timeline";
+import { type Trail, trailView } from "./trail-state";
 
 export interface RainUi {
   panel: HTMLElement;
@@ -388,11 +389,11 @@ export class Rain {
     this.onTrail(kind);
     // さかのぼる・くだり直すときも、見てほしいのは道のりなので閉じる
     this.closeInfo();
-    // 別の道のりの線は、ここでは伸びていかないので消す（合流点・支流・ダムの印は reveal() 側で出し直す）
-    setData(this.map, kind === "route" ? "upstream" : "downstream");
-    // 「上流へさかのぼる」「下流へくだる」は、今見ていない方だけ出す
-    if (this.upButton) this.upButton.hidden = kind !== "route";
-    if (this.downButton) this.downButton.hidden = kind !== "source";
+    const view = trailView(kind);
+    // 合流点・支流・ダムの印は reveal() 側で出し直す
+    setData(this.map, view.clearLine);
+    if (this.upButton) this.upButton.hidden = !view.showUp;
+    if (this.downButton) this.downButton.hidden = !view.showDown;
     this.camera?.dispose();
     const camera = new FollowCamera(this.map, pts, this.ui.panel);
     this.camera = camera;
@@ -727,9 +728,6 @@ export class Rain {
     setTimeout(() => popup.remove(), 2500);
   }
 }
-
-/** パネルの2つの道のり（雨の通り道・水の来た道） */
-export type Trail = "route" | "source";
 
 /** これより狭い集水域は「小さな水路」として、近くの雨がほとんどだと添える */
 const SMALL_BASIN_KM2 = 10;
