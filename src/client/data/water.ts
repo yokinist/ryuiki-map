@@ -202,9 +202,11 @@ function waterIndex() {
       );
       return { url, has: new Set(i.meshes) };
     })
-    .catch(() => {
-      index = null; // 読めなかったときは覚えずに、次の呼び出しでまた取りに行く
-      return { url: "", has: new Set<number>() };
+    .catch((err) => {
+      // 読めなかったときは覚えずに、次の呼び出しでまた取りに行く。空で解決すると、そのメッシュを「測定点なし」として
+      // waterFile が覚えてしまい、流域サマリも失敗を「ない」と出すので、失敗のまま伝える
+      index = null;
+      throw err;
     });
   return index;
 }
