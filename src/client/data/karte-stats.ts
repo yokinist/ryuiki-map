@@ -150,10 +150,6 @@ export interface DamOnPath {
 }
 
 /**
- * 流路 pts から maxM 以内にあるダム・堰を、流路の順に返す。
- * 名前のない堰は数が多く時系列が埋まるので除く。1つのダムが重ねて登録されていることがあるので、同じ名前は最初の1つにまとめる
- */
-/**
  * 流路 pts で、地点 (x, y) からいちばん近い点の添字を返す関数。maxM より遠ければ -1。
  * kx は流路の中ほどの緯度での経度1度あたりの m
  */
@@ -189,6 +185,10 @@ export function nearestOnPath(pts: LngLat[], maxM: number) {
   return { step, kx };
 }
 
+/**
+ * 流路 pts から maxM 以内にあるダム・堰を、流路の順に返す。
+ * 名前のない堰は数が多く時系列が埋まるので除く。1つのダムが重ねて登録されていることがあるので、同じ名前は最初の1つにまとめる
+ */
 export function damsNearPath(
   pts: LngLat[],
   dams: DamRow[],
