@@ -27,7 +27,8 @@ import {
 } from "../terrain/trace";
 import { FollowCamera } from "./camera";
 import { el } from "./dom";
-import { areaSize, eta, km } from "./format";
+import { areaSize } from "./format";
+import { JourneyPanel } from "./journey-panel";
 import { openKarte } from "./karte";
 import {
   easeInOut,
@@ -90,8 +91,7 @@ export class Rain {
   /** 「上流へさかのぼる」「下流へくだる」ボタン。今見ている方でない側だけ出す */
   private upButton: HTMLButtonElement | null = null;
   private downButton: HTMLButtonElement | null = null;
-  /** 出発点の説明（「出発点：」を付ける前の文字列） */
-  private originText = "";
+  private readonly panel: JourneyPanel;
 
   constructor(
     private readonly map: MlMap,
@@ -102,6 +102,7 @@ export class Rain {
     /** 見ている道のり（雨の通り道・水の来た道）が変わった。共有URLに残す */
     private readonly onTrail: (kind: Trail) => void,
   ) {
+    this.panel = new JourneyPanel(ui);
     this.timeline = new Timeline(ui.timeline);
     this.sourceTimeline = new Timeline(ui.sourceTimeline);
     // 2つの欄は name で束ねてあり、片方を開くともう片方は閉じる。開いた方の道のりをもう一度追う
@@ -175,11 +176,7 @@ export class Rain {
     this.openPanel("");
     this.closeInfo();
     this.ui.route.open = true;
-    this.ui.journey.dataset.loading = "";
-    this.ui.headline.textContent = "雨の流れをたどっています";
-    this.ui.announce.textContent = "雨の流れをたどっています";
-    this.ui.bar.style.transform = "";
-    this.ui.progress.textContent = text;
+    this.panel.searching(text);
     this.clearOverlays();
   }
 
@@ -188,35 +185,18 @@ export class Rain {
     this.ui.panel.dataset.state = "result";
     this.ui.result.hidden = false;
     this.ui.summary.hidden = true;
-    this.ui.share.hidden = true;
     this.ui.source.hidden = true;
     this.replay = {};
     this.showing = "route";
-    delete this.ui.journey.dataset.arrived;
-    this.setOrigin(origin);
+    this.panel.reset(origin);
     this.timeline.clear();
     this.sourceTimeline.clear();
     this.ui.sourceNote.replaceChildren();
   }
 
-  /**
-   * クリックした出発点の説明を出す。水源など他の地点と混同しないよう「出発点：」を付ける
-   * （調べている最中は何も付けない。空にするときも使う）
-   */
-  private setOrigin(text: string) {
-    this.originText = text;
-    this.ui.origin.textContent = text ? `出発点：${text}` : "";
-  }
-
-  /** 地名が後から届いたときに、標高の説明の前に書き足す */
-  private prependOrigin(text: string) {
-    this.setOrigin(`${text}・${this.originText}`);
-  }
-
   /** 読み込み・計算の進み具合。調べている最中ならパネルの見出しに、そうでなければ状態表示に出す */
   readonly loading = (text: string) => {
-    if (this.ui.journey.dataset.loading !== undefined)
-      this.ui.progress.textContent = text;
+    if (this.panel.isSearching) this.panel.say(text);
     else this.status(text);
   };
 
@@ -255,7 +235,7 @@ export class Rain {
     originPlace.then((p) => {
       if (!alive() || !p) return;
       origin = p;
-      this.prependOrigin(placeName(p));
+      this.panel.prependOrigin(placeName(p));
     });
     const along = placesAlong(path);
     along.then((a) => {
@@ -296,7 +276,7 @@ export class Rain {
         reveal(reached);
         // 見出しは今その道のりを見ているときだけ書き換える（水の来た道を見ている間に上書きしない）
         if (arrived && this.showing === "route")
-          this.showArrival(path, mouth, false);
+          this.panel.arrive(path, mouth, false);
       });
 
     const reveal = (k: number) => {
@@ -319,7 +299,7 @@ export class Rain {
     const descend = (onEnd: () => unknown) => {
       arrived = false; // たどっている間に河口の地名が届いても、見出しを結論にしない
       this.timeline.clear();
-      this.startJourney("ここに降った雨は…");
+      this.panel.start("ここに降った雨は…");
       this.follow(
         "route",
         path,
@@ -328,7 +308,7 @@ export class Rain {
           reached = k;
           this.advance("downstream", path.pts, k);
           reveal(k);
-          this.showProgress(path, k, "route");
+          this.panel.progress(path, k, "route");
         },
         onEnd,
       );
@@ -337,12 +317,12 @@ export class Rain {
       mouthReady.then(() => {
         if (!alive()) return;
         arrived = true;
-        this.showArrival(path, mouth ?? null, !up);
+        this.panel.arrive(path, mouth ?? null, !up);
         this.showSummary(path, originPlace, { g, s }, alive);
         this.replay.route = () =>
           descend(() => {
             arrived = true;
-            this.showArrival(path, mouth ?? null);
+            this.panel.arrive(path, mouth ?? null);
             this.scrollToActions();
           });
         // 大きな川では、さかのぼり専用の粗い範囲を先に読んでおく（押されたときに待たせない）。
@@ -421,87 +401,6 @@ export class Rain {
     requestAnimationFrame(frame);
   }
 
-  /** 雨粒が動き出す前の見出し。下るときもさかのぼるときも、結論が出るまでは同じ見た目（黒い見出しと進み具合のバー） */
-  private startJourney(headline: string) {
-    delete this.ui.journey.dataset.arrived;
-    this.ui.share.hidden = true; // 共有はアクションボタンと一緒に、着いてから出す（conclude で）
-    this.ui.headline.textContent = headline;
-    this.ui.progress.replaceChildren();
-    this.ui.bar.style.transform = "scaleX(0)";
-  }
-
-  /**
-   * 旅の見出しに進み具合（距離・所要時間・今いる川）を出す。
-   * さかのぼるときは「12.3 km上流・約3時間前」のように、上流への距離と何時間前の雨かで書く
-   */
-  private showProgress(
-    line: Pick<Path, "dist" | "rivers">,
-    k: number,
-    kind: Trail,
-  ) {
-    const d = line.dist[k];
-    const total = line.dist[line.dist.length - 1];
-    const river = line.rivers.findLast((r) => r.step <= k)?.name;
-    const up = kind === "source";
-    this.ui.bar.style.transform = `scaleX(${total > 0 ? d / total : 1})`;
-    this.ui.progress.replaceChildren(
-      el("b", { textContent: up ? `${km(d)}上流` : km(d) }),
-      ...(d > 0 ? [`・${eta(d)}${up ? "前" : ""}`] : []),
-      ...(river ? [`　${river}`] : []),
-    );
-  }
-
-  /**
-   * 到着したら、見出しを結論（どの海に・どれだけかけて・どこの河口から）に切り替える。
-   * announce: 読み上げるか（河口の地名を後から書き足すときは読み上げ直さない）
-   */
-  private showArrival(path: Path, mouth: Mouth | null, announce = true) {
-    const total = path.dist[path.dist.length - 1];
-    this.conclude(
-      path.toSea
-        ? `${mouth?.sea ?? "海"}にたどり着きました`
-        : "河口まで追いきれませんでした",
-      `${km(total)}・${eta(total)}`,
-      mouth?.name,
-      announce && `${km(total)}、${eta(total)}`,
-    );
-  }
-
-  /** さかのぼりが終わったら、見出しを結論（水源に着いた・どれだけ上流か）に切り替えて読み上げる */
-  private showSourceArrival(src: SourcePath) {
-    const total = src.dist[src.dist.length - 1];
-    this.conclude(
-      src.cut ? "水源まで追いきれませんでした" : "水源にたどり着きました",
-      `${km(total)}上流・${eta(total)}前`,
-      null,
-      `${km(total)}上流、${eta(total)}前`,
-    );
-  }
-
-  /**
-   * 見出しを結論に切り替える（雨の通り道・水の来た道で共通）。
-   * where: 2行目に添える地名。spoken: 読み上げる距離の言い方（false なら読み上げない）
-   */
-  private conclude(
-    headline: string,
-    distance: string,
-    where: string | null | undefined,
-    spoken: string | false,
-  ) {
-    this.ui.journey.dataset.arrived = "";
-    this.ui.headline.textContent = headline;
-    this.ui.progress.replaceChildren(
-      el("b", { textContent: distance }),
-      ...(where ? [el("br"), where] : []),
-    );
-    // 共有はアクションボタンと一緒に、着いたときだけ出す（さかのぼっている間は隠す）
-    this.ui.share.hidden = false;
-    if (spoken === false) return;
-    this.ui.announce.textContent = [headline, spoken, where]
-      .filter(Boolean)
-      .join("。");
-  }
-
   /** クリック地点の集水域を地図に塗る（数値は流域サマリで見る） */
   private showBasin(
     g: Grid,
@@ -520,8 +419,7 @@ export class Rain {
 
   private resetPanel(origin: string) {
     this.openPanel(origin);
-    delete this.ui.journey.dataset.loading;
-    this.startJourney("ここに降った雨は…");
+    this.panel.found();
   }
 
   private showSummary(
@@ -588,14 +486,14 @@ export class Rain {
     // 大きな川では、さかのぼり専用の粗い範囲を読んでから始める（読み込み中は見出しに出す）。
     // 読み込みを待つ間に河口の地名が届いても見出しを書き戻さないよう、先に「水の来た道」を見ている状態にする
     this.showing = "source";
-    this.startJourney("水源へさかのぼっています");
-    this.ui.progress.textContent = "上流の地形を読み込み中…";
+    this.panel.start("水源へさかのぼっています");
+    this.panel.say("上流の地形を読み込み中…");
     // 待っている間は押せないようにする（押し直すたびに読み込み中の表示に戻らないように）。
     // 戻すのは始めたときのボタン（待つ間に別の地点を選ぶと、this.upButton は新しいボタンを指す）
     const up = this.upButton;
     if (up) up.disabled = true;
     const basin = await basinAt(from, (text) => {
-      if (alive()) this.ui.progress.textContent = text;
+      if (alive()) this.panel.say(text);
     });
     if (up) up.disabled = false;
     // 待つ間に「雨の通り道」を開き直して下り直していたら、さかのぼりで割り込まない
@@ -609,7 +507,7 @@ export class Rain {
       basin.g === from.g
         ? coarse
         : ((await refineSource(coarse, from, basin.g, (text) => {
-            if (alive()) this.ui.progress.textContent = text;
+            if (alive()) this.panel.say(text);
           }).catch(() => null)) ?? coarse); // 引き直しの地形を読めなくても、粗い線で続ける
     if (!alive()) return;
     this.ui.route.open = false; // 下る旅はたたみ、さかのぼる道のりに目を移す
@@ -662,7 +560,7 @@ export class Rain {
     const climb = () => {
       this.sourceTimeline.clear();
       this.ui.sourceNote.replaceChildren();
-      this.startJourney("水源へさかのぼっています");
+      this.panel.start("水源へさかのぼっています");
       this.follow(
         "source",
         src,
@@ -672,10 +570,10 @@ export class Rain {
           // 雨粒の印も一緒にさかのぼらせ、河口と同じように水源に印が残るようにする
           this.advance("upstream", src.pts, k);
           reveal(k);
-          this.showProgress(src, k, "source");
+          this.panel.progress(src, k, "source");
         },
         () => {
-          this.showSourceArrival(src);
+          this.panel.arriveSource(src);
           this.showSourceNote(basin, src);
           this.scrollToActions();
         },
@@ -724,7 +622,7 @@ export class Rain {
       .setLngLat(p)
       .setText(text)
       .addTo(this.map);
-    this.ui.announce.textContent = text;
+    this.panel.announce(text);
     setTimeout(() => popup.remove(), 2500);
   }
 }
