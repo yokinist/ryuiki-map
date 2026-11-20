@@ -100,6 +100,35 @@ describe("timelineEvents", () => {
       ["ダムを通る", `利根川・${distance(3000)}`],
     ]);
   });
+
+  it("流路沿いの水のきれいさを、測った場所・BOD・年度・距離を添えて出す", () => {
+    const events = timelineEvents(
+      path,
+      [],
+      null,
+      null,
+      0,
+      [],
+      [
+        {
+          step: 2,
+          name: "大正橋",
+          bod: 1.6,
+          year: 2024,
+          level: 1,
+          label: "ヤマメ・イワナが棲めるくらい",
+          history: [{ year: 2024, bod: 1.6 }],
+        },
+      ],
+    );
+    expect(events.find((e) => e.kind === "water")).toMatchObject({
+      step: 2,
+      title: "水のきれいさ：ヤマメ・イワナが棲めるくらい",
+      score: 7, // BOD 1.6
+      note: undefined, // 比べる年度がない
+      sub: `大正橋で測定・BOD 1.6（2024年度の平均）・${distance(2000)}`,
+    });
+  });
 });
 
 // さかのぼる道のり（先頭がクリック地点、最後が水源）。利根川をさかのぼり、1点目で薄根川が流れ込み、2点目から片品川へ
@@ -163,6 +192,36 @@ describe("sourceEvents", () => {
     expect(dam).toMatchObject({
       title: "薗原ダムを通る",
       sub: "利根川・1.0 km上流・約17分前",
+    });
+  });
+
+  it("さかのぼる道のり沿いの水のきれいさは、上流への距離と何時間前の雨かを添えて出す", () => {
+    const events = sourceEvents(
+      source,
+      [],
+      null,
+      null,
+      [],
+      [
+        {
+          step: 2,
+          name: "大正橋",
+          bod: 4.2,
+          year: 2024,
+          level: 3,
+          label: "コイ・フナが棲めるくらい",
+          history: [
+            { year: 1994, bod: 9.3 },
+            { year: 2024, bod: 4.2 },
+          ],
+        },
+      ],
+    );
+    expect(events.find((e) => e.kind === "water")).toMatchObject({
+      title: "水のきれいさ：コイ・フナが棲めるくらい",
+      score: 4, // BOD 4.2
+      note: { text: "1994年度より よくなった", values: "BOD 9.3 → 4.2" },
+      sub: "大正橋で測定・BOD 4.2（2024年度の平均）・2.0 km上流・約33分前",
     });
   });
 });

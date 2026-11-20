@@ -13,6 +13,7 @@ import {
   placesAlong,
 } from "../data/places";
 import { seaAt } from "../data/seas";
+import { type WaterOnPath, waterAlong } from "../data/water";
 import type { LngLat } from "../geo";
 import { maskRect, paint, setData, setImage } from "../map/overlays";
 import { pixel } from "../map/theme";
@@ -268,6 +269,14 @@ export class Rain {
         reveal(reached);
       })
       .catch(() => {});
+    // 流路沿いの水のきれいさ（公共用水域の測定点）。読めなければ出さないだけ
+    let water: WaterOnPath[] = [];
+    waterAlong(path)
+      .then((list) => {
+        water = list;
+        reveal(reached);
+      })
+      .catch(() => {});
     // 河口の海と地名はどちらも別のファイルを読んでから分かる。
     // 到着は海が分かりしだい出し、河口の地名は分かったら書き足す（undefined = 海を調べ中）
     let mouth: Mouth | null | undefined = path.toSea ? undefined : null;
@@ -298,6 +307,7 @@ export class Rain {
         mouth,
         k,
         dams,
+        water,
       ).filter((ev) => ev.step <= k);
       this.timeline.add(events);
       this.showConfluences(events, path.pts);
@@ -610,6 +620,7 @@ export class Rain {
     // 水源の市区町村（未着なら undefined のまま「水源」と出す）
     let sourcePlace: Place | null | undefined;
     let dams: DamOnPath[] = [];
+    let water: WaterOnPath[] = [];
     let reached = -1;
     const reveal = (k: number) => {
       if (!alive()) return;
@@ -619,6 +630,7 @@ export class Rain {
         origin,
         sourcePlace,
         dams,
+        water,
       ).filter((ev) => ev.step <= k);
       this.sourceTimeline.add(events);
       this.showConfluences(events, src.pts);
@@ -630,6 +642,12 @@ export class Rain {
     damsAlong(src.pts)
       .then((list) => {
         dams = list;
+        reveal(reached);
+      })
+      .catch(() => {});
+    waterAlong(src)
+      .then((list) => {
+        water = list;
         reveal(reached);
       })
       .catch(() => {});
