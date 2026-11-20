@@ -1,5 +1,11 @@
 import type { DamOnPath } from "../data/karte-stats";
 import { type Place, type PlaceEvent, placeName } from "../data/places";
+import {
+  trendNote,
+  WATER_SCORE_MAX,
+  type WaterOnPath,
+  waterScore,
+} from "../data/water";
 import type { Path } from "../terrain/trace";
 import { el } from "./dom";
 import { distance, eta, km } from "./format";
@@ -8,9 +14,15 @@ export interface TimelineEvent {
   id: string;
   /** 流路上の位置（Path.pts の添字）。この順に並べる */
   step: number;
-  kind: "place" | "river" | "branch" | "dam" | "end";
+  kind: "place" | "river" | "branch" | "dam" | "water" | "end";
   title: string;
   sub: string;
+  /** 水のきれいさの点数（1〜WATER_SCORE_MAX）。あればメーターにして出す */
+  score?: number;
+  /** 水のきれいさの推移の一言（「1994年度より よくなった」と「BOD 9.3 → 3.4」）。比べる年度がなければ undefined */
+  note?: { text: string; values: string };
+  /** 水のきれいさの推移。年度ごとの BOD（古い順）。小さな折れ線にする */
+  history?: { year: number; bod: number }[];
 }
 
 export interface Mouth {
@@ -41,6 +53,7 @@ export function timelineEvents(
   mouth: Mouth | null | undefined,
   k: number,
   dams: DamOnPath[] = [],
+  water: WaterOnPath[] = [],
 ): TimelineEvent[] {
   const n = path.pts.length;
   const at = (step: number) => distance(path.dist[step]);
@@ -62,7 +75,7 @@ export function timelineEvents(
           : `${path.rivers[i - 1].name} → ${r.name}・${at(r.step)}`,
       };
     }),
-    ...alongEvents(path.rivers, at, dams, places, origin),
+    ...alongEvents(path.rivers, at, dams, places, origin, water),
   ];
   // 最後の項目は河口の海と地名が分かってから出す
   if (k >= n - 1 && mouth !== undefined)
@@ -98,6 +111,7 @@ export function sourceEvents(
   /** 水源の市区町村（届く前は undefined、分からなければ null。分かれば見出しにする） */
   sourcePlace?: Place | null,
   dams: DamOnPath[] = [],
+  water: WaterOnPath[] = [],
 ): TimelineEvent[] {
   const n = src.pts.length;
   const at = (step: number) => {
@@ -122,7 +136,7 @@ export function sourceEvents(
       title: `${t.name}が流れ込む`,
       sub: withRiver(src.rivers, at, t.step),
     })),
-    ...alongEvents(src.rivers, at, dams, places, origin),
+    ...alongEvents(src.rivers, at, dams, places, origin, water),
     {
       id: "end",
       step: n - 1,
@@ -149,7 +163,7 @@ function withRiver(
 }
 
 /**
- * 道のり沿いのダムと市区町村（出発点の市区町村は除く）。雨の通り道・水の来た道で共通。
+ * 道のり沿いのダム・水のきれいさ・市区町村（出発点の市区町村は除く）。雨の通り道・水の来た道で共通。
  * 添え書きはその位置の川の名前と、at で書いた距離
  */
 function alongEvents(
@@ -158,8 +172,19 @@ function alongEvents(
   dams: DamOnPath[],
   places: PlaceEvent[],
   origin: Place | null,
+  water: WaterOnPath[],
 ): TimelineEvent[] {
   return [
+    ...water.map((w) => ({
+      id: `w${w.step}${w.name}`,
+      step: w.step,
+      kind: "water" as const,
+      title: `水のきれいさ：${w.label}`,
+      score: waterScore(w.bod),
+      note: trendNote(w.history),
+      history: w.history,
+      sub: `${w.name}で測定・BOD ${w.bod}（${w.year}年度の平均）・${at(w.step)}`,
+    })),
     ...dams.map((d) => ({
       id: `d${d.step}${d.name}`,
       step: d.step,
@@ -217,23 +242,91 @@ export class Timeline {
   }
 }
 
-// 同じ地点なら「川に合流」→ ダム → 地名の順に
+// 同じ地点なら「川に合流」→ ダム → 水のきれいさ → 地名の順に
 const rank = (ev: TimelineEvent) =>
-  ev.kind === "river" ? 0 : ev.kind === "dam" ? 1 : 2;
+  ev.kind === "river" ? 0 : ev.kind === "dam" ? 1 : ev.kind === "water" ? 2 : 3;
 
 function item(ev: TimelineEvent) {
   const li = el(
     "li",
     { className: `timeline__item timeline__item--${ev.kind}` },
     el("b", { className: "timeline__title", textContent: ev.title }),
+    ...(ev.score ? [meter(ev.score)] : []),
     el("small", { className: "timeline__sub", textContent: ev.sub }),
+    ...(ev.note && ev.history
+      ? [
+          el(
+            "small",
+            { className: "timeline__trend" },
+            sparkline(ev.history),
+            el(
+              "span",
+              { className: "timeline__trend-text" },
+              el("b", { textContent: ev.note.text }),
+              el("span", {
+                className: "timeline__trend-values",
+                textContent: ev.note.values,
+              }),
+            ),
+          ),
+        ]
+      : []),
   );
   li.dataset.step = String(ev.step);
   return li;
 }
 
+/**
+ * 推移の小さな折れ線。横は年度、縦はきれいさの点数（上ほどきれい。メーターと同じ向き）。
+ * 値は横の一言で読めるので、図は読み上げない
+ */
+function sparkline(history: { year: number; bod: number }[]) {
+  const W = 56;
+  const H = 16;
+  const y0 = history[0].year;
+  const span = history[history.length - 1].year - y0 || 1;
+  const xy = history.map(({ year, bod }) => [
+    ((year - y0) / span) * (W - 4) + 2,
+    H - 2 - ((waterScore(bod) - 1) / (WATER_SCORE_MAX - 1)) * (H - 4),
+  ]);
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.setAttribute("class", "sparkline");
+  svg.setAttribute("aria-hidden", "true");
+  const line = document.createElementNS(NS, "polyline");
+  line.setAttribute("points", xy.map((p) => p.join(",")).join(" "));
+  svg.append(line);
+  // 両端に点を置き、いつからいつまでの線かを分かりやすくする（最新の側を塗り、古い側は輪にする）
+  for (const [i, [cx, cy]] of [xy[0], xy[xy.length - 1]].entries()) {
+    const dot = document.createElementNS(NS, "circle");
+    dot.setAttribute("cx", String(cx));
+    dot.setAttribute("cy", String(cy));
+    dot.setAttribute("r", "2.5");
+    dot.setAttribute("class", i ? "sparkline__now" : "sparkline__then");
+    svg.append(dot);
+  }
+  return svg;
+}
+
+/** 小さなメーター。塗った数が点数（スクリーンリーダーには「10段階の7」のように読ませる） */
+function meter(score: number) {
+  return el(
+    "span",
+    {
+      className: "meter",
+      role: "img",
+      ariaLabel: `${WATER_SCORE_MAX}段階の${score}`,
+    },
+    ...Array.from({ length: WATER_SCORE_MAX }, (_, i) =>
+      el("i", { className: i < score ? "meter__on" : "" }),
+    ),
+  );
+}
+
 function setText(li: HTMLLIElement, ev: TimelineEvent) {
-  const [title, sub] = li.children;
+  const title = li.children[0];
+  const sub = li.querySelector(".timeline__sub") as Element;
   if (title.textContent !== ev.title) title.textContent = ev.title;
   if (sub.textContent !== ev.sub) sub.textContent = ev.sub;
 }
