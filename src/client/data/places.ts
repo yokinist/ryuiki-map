@@ -4,6 +4,7 @@ import { SOURCES } from "../config";
 import type { LngLat } from "../geo";
 import type { Path } from "../terrain/trace";
 import { areasNear, cellOf, nearestArea } from "./place-grid";
+import type { SearchRow } from "./place-search";
 
 /** 市区町村。key は市区町村コード。aza は町丁・字等（出発点・河口・水源だけ。分からなければ省く） */
 export interface Place {
@@ -66,6 +67,25 @@ function placeIndex() {
       };
     });
   return index;
+}
+
+/** 地名の文字検索の表（public/places/<版>/search.json）。検索欄を使い始めたときだけ読む（gzip で約2MB） */
+let search: Promise<{
+  rows: SearchRow[];
+  cities: PlaceIndex["cities"];
+}> | null = null;
+export function searchIndex() {
+  search ??= placeIndex()
+    .then(async ({ url, cities }) => {
+      const res = await fetch(`${url}/search.json`);
+      if (!res.ok) throw new Error(String(res.status));
+      return { rows: (await res.json()) as SearchRow[], cities };
+    })
+    .catch((e) => {
+      search = null; // 読めなかったときは覚えずに、次の呼び出しでまた取りに行く
+      throw e;
+    });
+  return search;
 }
 
 /** 1次メッシュ1つ分の格子。ないメッシュ（海など）は null */

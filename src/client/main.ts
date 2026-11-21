@@ -13,6 +13,7 @@ import {
   SOURCES,
   START_BOUNDS,
 } from "./config";
+import type { SearchHit } from "./data/place-search";
 import { onRiversChange, showRivers } from "./data/rivers";
 import { type BBox, covers, inBBox, type LngLat } from "./geo";
 import { addHillProtocol, HILL_TILES } from "./map/hill";
@@ -32,10 +33,11 @@ import { gridSpec } from "./terrain/grid-spec";
 import { snap } from "./terrain/hydro";
 import { traceToSea } from "./terrain/trace";
 import { freeCenter, paddingAround } from "./ui/camera";
-import { $, helpButtonAndText } from "./ui/dom";
+import { $, el, helpButtonAndText } from "./ui/dom";
 import { setupKarte } from "./ui/karte";
-import { reducedMotion } from "./ui/motion";
+import { easeInOut, reducedMotion } from "./ui/motion";
 import { Rain } from "./ui/rain";
+import { setupSearch } from "./ui/search";
 import { trailView } from "./ui/trail-state";
 
 // タッチ端末にはカーソルがなく、流れの先読みは出ないので案内しない
@@ -399,6 +401,47 @@ async function onClick(p: LngLat, up = false) {
   }
 }
 
+/** 地名の検索で選んだ所に出す印。雨は自動では降らせないので、クリックすればたどれることを添え、次に地図をクリックするまで出しておく */
+let searched: maplibregl.Popup | undefined;
+const SEARCHED_NOTE = "地図をクリックすると、そこに降った雨の流れをたどります";
+
+/** 地名の検索で選んだ所へ地図を動かす。着いたら地名を出し、そこからは地図をクリックして雨を降らせる */
+function goTo({ label, p, aza }: SearchHit) {
+  rain.clear(); // 前の道のりを追いかけるカメラを止め、新しい場所で始められるようにする
+  searched?.remove();
+  const zoom = aza ? 14 : 12;
+  // パネルを避けた中心はここで計算して渡す（padding を flyTo に渡すと地図に残り、以後の動きで二重に効く）
+  const to = map.cameraForBounds([p, p], {
+    padding: paddingAround(map, $("panel")),
+    maxZoom: zoom,
+  });
+  // 遠くへ移ることが多いので、一度引いてから寄る flyTo にする。MapLibre の既定の easing は動き出しの速さが0でないので、0から上げ下げするものに替える
+  map.flyTo({
+    center: to?.center ?? p,
+    zoom,
+    easing: easeInOut,
+    ...(reducedMotion() ? { duration: 0 } : {}),
+  });
+  map.once("moveend", () => {
+    searched = new maplibregl.Popup({
+      closeButton: false,
+      className: "hint hint--place",
+      offset: 8,
+    })
+      .setLngLat(p)
+      .setDOMContent(
+        el(
+          "div",
+          {},
+          el("strong", { textContent: label }),
+          el("span", { textContent: SEARCHED_NOTE }),
+        ),
+      )
+      .addTo(map);
+    $("announce").textContent = `${label}に移りました。${SEARCHED_NOTE}。`;
+  });
+}
+
 // ---- マウス位置からの流れを先読み（読み込み済みのグリッドだけで追い、地形は取りに行かない） ----
 let hoverQueued = false;
 let hoverAt: LngLat = [0, 0];
@@ -564,4 +607,6 @@ async function main() {
   computeWhenIdle();
 }
 
+// 検索欄は地図の読み込みを待たずに使えるようにする（読み込みの遅い回線で、打っても何も出ないことがないように）
+setupSearch(goTo);
 main();
