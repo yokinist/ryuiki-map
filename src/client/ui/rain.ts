@@ -27,13 +27,13 @@ import { FollowCamera } from "./camera";
 import { el } from "./dom";
 import { areaSize } from "./format";
 import { JourneyPanel } from "./journey-panel";
-import { openKarte } from "./karte";
 import {
   easeInOut,
   indexAtDistance,
   playDuration,
   reducedMotion,
 } from "./motion";
+import { SummaryActions } from "./summary-actions";
 import {
   type Mouth,
   mouthName,
@@ -84,9 +84,7 @@ export class Rain {
   private showing: Trail = "route";
   /** 欄を開き直したときに、その道のりをもう一度追う */
   private replay: Partial<Record<Trail, () => void>> = {};
-  /** 「上流へさかのぼる」「下流へくだる」ボタン。今見ている方でない側だけ出す */
-  private upButton: HTMLButtonElement | null = null;
-  private downButton: HTMLButtonElement | null = null;
+  private readonly actions: SummaryActions;
   private readonly panel: JourneyPanel;
 
   constructor(
@@ -100,6 +98,7 @@ export class Rain {
   ) {
     this.panel = new JourneyPanel(ui);
     this.layers = new TrailLayers(map);
+    this.actions = new SummaryActions(ui);
     this.timeline = new Timeline(ui.timeline);
     this.sourceTimeline = new Timeline(ui.sourceTimeline);
     // 2つの欄は name で束ねてあり、片方を開くともう片方は閉じる。開いた方の道のりをもう一度追う
@@ -141,7 +140,7 @@ export class Rain {
   private openPanel(origin: string) {
     this.ui.panel.dataset.state = "result";
     this.ui.result.hidden = false;
-    this.ui.summary.hidden = true;
+    this.actions.hide();
     this.ui.source.hidden = true;
     this.replay = {};
     this.showing = "route";
@@ -275,17 +274,19 @@ export class Rain {
         if (!alive()) return;
         arrived = true;
         this.panel.arrive(path, mouth ?? null, !up);
-        this.showSummary(path, originPlace, { g, s }, alive);
+        this.actions.show(path, originPlace, { g, s }, () =>
+          this.playSource({ g, s }, originPlace, alive),
+        );
         this.replay.route = () =>
           descend(() => {
             arrived = true;
             this.panel.arrive(path, mouth ?? null);
-            this.scrollToActions();
+            this.actions.scrollTo();
           });
         // 大きな川では、さかのぼり専用の粗い範囲を先に読んでおく（押されたときに待たせない）。
         // 集水域を数えるのに数十 ms かかるので、着地の動きを止めないよう、カメラが着地し終えてから始める。
         // クリックした範囲からはみ出していたら、さかのぼるときと同じ集水域で塗り直す（さかのぼりに移っていれば playSource が塗る）
-        if (up) this.upButton?.click();
+        if (up) this.actions.up?.click();
         else
           this.camera?.landed.then(async () => {
             if (!alive() || this.showing !== "route") return;
@@ -329,8 +330,7 @@ export class Rain {
     const view = trailView(kind);
     // 合流点・支流・ダムの印は reveal() 側で出し直す
     this.layers.clearLine(view.clearLine);
-    if (this.upButton) this.upButton.hidden = !view.showUp;
-    if (this.downButton) this.downButton.hidden = !view.showDown;
+    this.actions.showFor(view);
     this.camera?.dispose();
     const camera = new FollowCamera(this.map, pts, this.ui.panel);
     this.camera = camera;
@@ -363,56 +363,6 @@ export class Rain {
     this.panel.found();
   }
 
-  private showSummary(
-    path: Path,
-    originPlace: Promise<Place | null>,
-    from: { g: Grid; s: number },
-    alive: () => boolean,
-  ) {
-    const up = button("secondary", "上流へさかのぼる", () =>
-      this.playSource(from, originPlace, alive),
-    );
-    // 雨の通り道は name で束ねてあるので、開けば水の来た道は閉じる
-    const down = button("secondary", "下流へくだる", () => {
-      this.ui.route.open = true;
-    });
-    down.hidden = true;
-    this.upButton = up;
-    this.downButton = down;
-    this.ui.summary.replaceChildren(
-      ...(path.toSea
-        ? []
-        : [
-            el("p", {
-              className: "note",
-              textContent:
-                "この先の地形を読み込めず、河口まで追えませんでした。",
-            }),
-          ]),
-      up,
-      down,
-      karteButton(path, originPlace, from),
-    );
-    this.ui.summary.hidden = false;
-    this.scrollToActions();
-  }
-
-  /**
-   * まとめ（さかのぼる・くだる・流域サマリのボタンと共有リンク）の頭が、貼り付いた旅の見出しのすぐ下に来るまでスクロールする。
-   * 一番下まで送ると、スマホ（パネルが画面の半分）ではボタンが上に押し出されて見切れるので、末尾でなく先頭に合わせる。
-   * 河口に着いたときも水源に着いたときも同じボタンの並びなので共通の位置に合わせる
-   * （呼ぶ時点でまだ高さが反映されていないことがあるので描画後に）
-   */
-  private scrollToActions() {
-    const panel = this.ui.panel;
-    requestAnimationFrame(() =>
-      panel.scrollTo({
-        top: this.ui.summary.offsetTop - this.ui.journey.offsetHeight,
-        behavior: reducedMotion() ? "auto" : "smooth",
-      }),
-    );
-  }
-
   /**
    * クリック地点から、支流の先の先までたどっていちばん遠い水源へさかのぼる。道のりの線をクリック地点から上流へ伸ばし、
    * 通る川・流れ込む支流・市区町村を「水の来た道」に並べる。河口に着いてから呼ぶ（同じ再生の alive を使う）
@@ -430,8 +380,8 @@ export class Rain {
     this.panel.start("水源へさかのぼっています");
     this.panel.say("上流の地形を読み込み中…");
     // 待っている間は押せないようにする（押し直すたびに読み込み中の表示に戻らないように）。
-    // 戻すのは始めたときのボタン（待つ間に別の地点を選ぶと、this.upButton は新しいボタンを指す）
-    const up = this.upButton;
+    // 戻すのは始めたときのボタン（待つ間に別の地点を選ぶと、actions.up は新しいボタンを指す）
+    const up = this.actions.up;
     if (up) up.disabled = true;
     const basin = await basinAt(from, (text) => {
       if (alive()) this.panel.say(text);
@@ -517,7 +467,7 @@ export class Rain {
         () => {
           this.panel.arriveSource(src);
           this.showSourceNote(basin, src);
-          this.scrollToActions();
+          this.actions.scrollTo();
         },
       );
     };
@@ -573,31 +523,3 @@ export class Rain {
 const SMALL_BASIN_KM2 = 10;
 /** 水源とクリック地点の高低差がこれ未満なら平地とみなす */
 const FLAT_RELIEF_M = 30;
-
-/** 集水域の流域サマリ（面積・土地・人口・降水量・ダム）を開くボタン */
-function karteButton(
-  path: Path,
-  originPlace: Promise<Place | null>,
-  from: { g: Grid; s: number },
-) {
-  // 出発点が名前のある川の上なら、その川の名前を見出しにする
-  const river = path.rivers[0]?.step === 0 ? path.rivers[0].name : undefined;
-  const down = { m: path.dist[path.dist.length - 1], toSea: path.toSea };
-  return button("primary", "流域サマリを見る", () =>
-    openKarte(from, river, originPlace, down, path),
-  );
-}
-
-function button(
-  variant: "primary" | "secondary",
-  text: string,
-  onClick: () => void,
-) {
-  const btn = el("button", {
-    type: "button",
-    className: `button button--${variant}`,
-    textContent: text,
-  });
-  btn.addEventListener("click", onClick);
-  return btn;
-}
