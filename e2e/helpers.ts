@@ -5,6 +5,30 @@ export async function waitForArrival(page: Page) {
   await expect(page.locator("#share")).toBeVisible();
 }
 
+/**
+ * act（ボタンを押すなど）のあとに共有が一度隠れたかを確かめる。
+ * 重いと、押してから見に行くまでに道のりをたどり終えてまた出ていることがあるので、見に行かずに属性の変化で拾う
+ */
+export async function expectShareHidesOn(page: Page, act: () => Promise<void>) {
+  await page.evaluate(() => {
+    const share = document.querySelector<HTMLElement>("#share");
+    if (!share) throw new Error("#share がありません");
+    const w = window as { shareHid?: boolean };
+    w.shareHid = false;
+    new MutationObserver((_, o) => {
+      if (!share.hidden) return;
+      w.shareHid = true;
+      o.disconnect();
+    }).observe(share, { attributes: true, attributeFilter: ["hidden"] });
+  });
+  await act();
+  await expect
+    .poll(() =>
+      page.evaluate(() => (window as { shareHid?: boolean }).shareHid),
+    )
+    .toBe(true);
+}
+
 /** 「24.0 km」「213.4 km上流」「820 m」のような文字から距離 km を読む（format.ts の km は 1km 未満を m で出す） */
 export function kmOf(text: string): number {
   // km を先に探す（「標高 1,999 m」のような別の値を拾わないように）。km がなければ m
