@@ -257,3 +257,22 @@ describe("citizenBands", () => {
     expect(band).toMatchObject({ kind: "band", title: "市民の調査 2地点" });
   });
 });
+
+describe("citizenBands の出し方", () => {
+  const dot = (step: number) => ({
+    step,
+    kind: "citizen" as const,
+    tone: 0,
+    text: `地点${step}`,
+  });
+
+  it("3地点までは、押さなくても読めるよう中身を並べる（listed）。4地点からは点にして、押すと中身", () => {
+    const [few] = citizenBands([dot(1), dot(2), dot(3)], [], 5);
+    const [many] = citizenBands([dot(1), dot(2), dot(3), dot(4)], [], 5);
+    expect(few).toMatchObject({ listed: true, sub: "" });
+    expect(many).toMatchObject({
+      listed: false,
+      sub: "点を押すと場所と結果",
+    });
+  });
+});

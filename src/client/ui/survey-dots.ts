@@ -13,6 +13,8 @@ export interface SurveyDot {
   kind: "water" | "citizen";
   tone: number;
   text: string;
+  /** 地点が少ない帯に並べる短い中身（場所と結果だけ）。市民の調査地点だけ */
+  short?: string;
 }
 
 const month = (date: string) => {
@@ -40,12 +42,14 @@ export function citizenDots(
       kind: "citizen" as const,
       tone: suiseiTone(s.value),
       text: `${s.name}・${suiseiLabel(s.value)}（川の生きもの調べ・${month(s.date)}）`,
+      short: `${s.name}・${suiseiLabel(s.value)}`,
     })),
     ...mizumap.map((s) => ({
       step: s.step,
       kind: "citizen" as const,
       tone: codGrade(s.value).level,
       text: `${s.name}・${codGrade(s.value).label}・COD ${s.value}（市民の水質調べ・${month(s.date)}）`,
+      short: `${s.name}・${codGrade(s.value).label}（COD ${s.value}）`,
     })),
   ].sort((a, b) => a.step - b.step);
 }

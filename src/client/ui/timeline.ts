@@ -15,6 +15,9 @@ import type { SurveyDot } from "./survey-dots";
  * 市民の調査地点を、その手前の環境省の測定点（anchors は流路の位置）ごとに1つの帯にまとめる。
  * 最初の測定点より上流の地点は、最初の地点の位置にまとめる。雨粒がまだ着いていない地点（k より先）は入れない
  */
+/** この数までの帯は、点にせず中身を並べる。少ないのに1つずつ押して読むのは手間なので */
+const LIST_MAX = 3;
+
 export function citizenBands(
   dots: SurveyDot[],
   anchors: number[],
@@ -26,14 +29,18 @@ export function citizenBands(
     const at = anchors.findLast((a) => a <= d.step) ?? reached[0].step;
     groups.set(at, [...(groups.get(at) ?? []), d]);
   }
-  return [...groups].map(([step, group]) => ({
-    id: `c${step}`,
-    step,
-    kind: "band" as const,
-    title: `市民の調査 ${group.length}地点`,
-    sub: "点を押すと場所と結果",
-    dots: group,
-  }));
+  return [...groups].map(([step, group]) => {
+    const listed = group.length <= LIST_MAX;
+    return {
+      id: `c${step}`,
+      step,
+      kind: "band" as const,
+      title: `市民の調査 ${group.length}地点`,
+      sub: listed ? "" : "点を押すと場所と結果",
+      dots: group,
+      listed,
+    };
+  });
 }
 
 export interface TimelineEvent {
@@ -45,6 +52,8 @@ export interface TimelineEvent {
   sub: string;
   /** 市民の調査地点を色の点で並べる帯の点 */
   dots?: SurveyDot[];
+  /** 帯の点を、色の点だけでなく中身の1行ずつで並べる（地点が少ないとき） */
+  listed?: boolean;
   /** 水のきれいさの点数（1〜WATER_SCORE_MAX）。あればメーターにして出す */
   score?: number;
   /** 水のきれいさの推移の一言（「1994年度より よくなった」と「BOD 9.3 → 3.4」）。比べる年度がなければ undefined */
@@ -281,7 +290,7 @@ function item(ev: TimelineEvent) {
     { className: `timeline__item timeline__item--${ev.kind}` },
     el("b", { className: "timeline__title", textContent: ev.title }),
     ...(ev.score ? [meter(ev.score)] : []),
-    ...(ev.dots ? [dotRow(ev.dots)] : []),
+    ...(ev.dots ? [bandBody(ev.dots, ev.listed)] : []),
     el("small", { className: "timeline__sub", textContent: ev.sub }),
     ...(ev.note && ev.history
       ? [
@@ -310,6 +319,19 @@ function item(ev: TimelineEvent) {
  * 市民の調査の点の帯。点を押すと、帯の下の添え書きをその地点の中身にし、"survey-dot"（detail はその点）を投げる。
  * 地図の同じ点を目立たせるのに使う
  */
+function bandBody(dots: SurveyDot[], listed = false) {
+  if (!listed) return dotRow(dots);
+  return el(
+    "ul",
+    { className: "survey-list" },
+    ...dots.map((d) => {
+      const dot = el("span", { className: "survey-dot", ariaHidden: "true" });
+      dot.dataset.tone = String(d.tone);
+      return el("li", { title: d.text }, dot, d.short ?? d.text);
+    }),
+  );
+}
+
 function dotRow(dots: SurveyDot[]) {
   const row = el("span", { className: "survey-dots" });
   for (const d of dots) {
@@ -386,11 +408,11 @@ function setText(li: HTMLLIElement, ev: TimelineEvent) {
   const sub = li.querySelector(".timeline__sub") as Element;
   if (title.textContent !== ev.title) title.textContent = ev.title;
   if (ev.dots) {
-    // 雨粒が進むと帯の点が増える。点を押して出した中身はそのまま残す
-    const row = li.querySelector(".survey-dots") as Element;
-    if (row.children.length !== ev.dots.length) {
-      row.replaceWith(dotRow(ev.dots));
-      title.textContent = ev.title;
+    // 雨粒が進むと帯の点が増える。増えたときだけ作り直し、点を押して出した中身はそのまま残す
+    const body = li.querySelector(".survey-dots, .survey-list") as Element;
+    if (body.children.length !== ev.dots.length) {
+      body.replaceWith(bandBody(ev.dots, ev.listed));
+      sub.textContent = ev.sub;
     }
     return;
   }
