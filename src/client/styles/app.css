@@ -451,6 +451,44 @@ p {
   color: var(--color-water-strong);
   font-size: var(--font-size-sm);
 }
+/* 市民の調査の帯。環境省の測定点ごとに、市民の調査地点を段階の色の点で並べる。輪は置かず、前の項目の添え書きのように控えめに */
+.timeline__item--band {
+  margin-top: calc(-1 * var(--space-1));
+}
+.timeline__item--band::before {
+  display: none;
+}
+.timeline__item--band .timeline__title {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-xs);
+  font-weight: normal;
+}
+.timeline__dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 3px;
+}
+.timeline__dot {
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  border: 2px solid var(--color-surface);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+}
+.timeline__dot[data-tone="0"] {
+  background: var(--color-survey-0);
+}
+.timeline__dot[data-tone="1"] {
+  background: var(--color-survey-1);
+}
+.timeline__dot[data-tone="2"] {
+  background: var(--color-survey-2);
+}
+.timeline__dot.is-on {
+  outline: 2px solid var(--color-water-strong);
+}
 /* 支流の合流（水の来た道）は、たどっている川の名前が変わるわけではないので輪だけにして控えめに */
 .timeline__item--branch::before {
   border-color: var(--color-water);

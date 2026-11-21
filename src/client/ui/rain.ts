@@ -5,6 +5,7 @@ import {
   damsAlong,
   prefetchBasin,
 } from "../data/karte";
+import { mizumapAlong } from "../data/mizumap";
 import {
   type Place,
   type PlaceEvent,
@@ -13,7 +14,8 @@ import {
   placesAlong,
 } from "../data/places";
 import { seaAt } from "../data/seas";
-import { type WaterOnPath, waterAlong } from "../data/water";
+import { suiseiAlong } from "../data/suisei";
+import { stationsAlong, type WaterOnPath, waterAlong } from "../data/water";
 import type { LngLat } from "../geo";
 import { type Grid, gridAt } from "../terrain/grid";
 import { snap } from "../terrain/hydro";
@@ -35,15 +37,43 @@ import {
 } from "./motion";
 import { SummaryActions } from "./summary-actions";
 import {
+  citizenBands,
+  citizenDots,
   type Mouth,
   mouthName,
   type SourcePath,
+  type SurveyDot,
   sourceEvents,
   Timeline,
+  type TimelineEvent,
   timelineEvents,
+  waterDots,
 } from "./timeline";
+
 import { TrailLayers } from "./trail-layers";
 import { type Trail, trailView } from "./trail-state";
+
+/** 道のり沿いの調査地点。water は環境省の測定点（間引かずに全部）、citizen は川の生きもの調べと市民の水質調べ */
+interface Survey {
+  water: SurveyDot[];
+  citizen: SurveyDot[];
+}
+
+/** 道のり沿いの調査地点を読む。どれかが読めなければ、その分は出さないだけ */
+async function surveyAlong(
+  path: Parameters<typeof stationsAlong>[0] & { dist: number[] },
+): Promise<Survey> {
+  const none = () => [];
+  const [stations, suisei, mizumap] = await Promise.all([
+    stationsAlong(path).catch(none),
+    suiseiAlong(path).catch(none),
+    mizumapAlong(path).catch(none),
+  ]);
+  return {
+    water: waterDots(stations),
+    citizen: citizenDots(suisei, mizumap),
+  };
+}
 
 export interface RainUi {
   panel: HTMLElement;
@@ -76,6 +106,11 @@ export class Rain {
   private readonly timeline: Timeline;
   private readonly sourceTimeline: Timeline;
   private camera: FollowCamera | null = null;
+  /** 地図に置いている調査地点と、時系列の帯で押して目立たせている市民の地点（流路の添字） */
+  private surveyOnMap: { dots: SurveyDot[]; pts: LngLat[]; on?: SurveyDot } = {
+    dots: [],
+    pts: [],
+  };
   /** さかのぼりのたびに増える。もう一度さかのぼったら、前のさかのぼりの非同期処理（地名・ダム）を打ち切る */
   private sourceRun = 0;
   /** 道のりを追う動きのたびに増える。雨の通り道と水の来た道は同時に1つだけ動かす */
@@ -101,6 +136,13 @@ export class Rain {
     this.actions = new SummaryActions(ui);
     this.timeline = new Timeline(ui.timeline);
     this.sourceTimeline = new Timeline(ui.sourceTimeline);
+    // 時系列の帯で市民の調査地点を押したら、地図の同じ点を目立たせる
+    for (const list of [ui.timeline, ui.sourceTimeline])
+      list.addEventListener("survey-dot", (e) => {
+        const s = this.surveyOnMap;
+        s.on = (e as CustomEvent<SurveyDot>).detail;
+        this.layers.showSurvey(s.dots, s.pts, s.on);
+      });
     // 2つの欄は name で束ねてあり、片方を開くともう片方は閉じる。開いた方の道のりをもう一度追う
     for (const kind of ["route", "source"] as const)
       ui[kind].addEventListener("toggle", () => {
@@ -206,14 +248,20 @@ export class Rain {
         reveal(reached);
       })
       .catch(() => {});
-    // 流路沿いの水のきれいさ（公共用水域の測定点）。読めなければ出さないだけ
-    let water: WaterOnPath[] = [];
+    // 流路沿いの水のきれいさ（公共用水域の測定点）。読めなければ出さないだけ（undefined = 読み込み中）
+    let water: WaterOnPath[] | undefined;
     waterAlong(path)
+      .catch(() => [])
       .then((list) => {
         water = list;
         reveal(reached);
-      })
-      .catch(() => {});
+      });
+    // 地図の調査地点と、時系列の市民の調査の帯
+    let survey: Survey = { water: [], citizen: [] };
+    surveyAlong(path).then((s) => {
+      survey = s;
+      reveal(reached);
+    });
     // 河口の海と地名はどちらも別のファイルを読んでから分かる。
     // 到着は海が分かりしだい出し、河口の地名は分かったら書き足す（undefined = 海を調べ中）
     let mouth: Mouth | null | undefined = path.toSea ? undefined : null;
@@ -244,9 +292,12 @@ export class Rain {
         mouth,
         k,
         dams,
-        water,
+        water ?? [],
       ).filter((ev) => ev.step <= k);
-      this.timeline.add(events);
+      this.timeline.add([
+        ...events,
+        ...this.showSurvey("route", survey, water, path.pts, k),
+      ]);
       this.layers.showConfluences(events, path.pts);
     };
 
@@ -304,6 +355,34 @@ export class Rain {
       return;
     }
     descend(finish);
+  }
+
+  /**
+   * 雨粒が k まで着いた調査地点を地図に点で置き、市民の調査地点を時系列の帯にして返す。
+   * 帯は時系列に出している環境省の測定点（water）ごとにまとめる。帯の id はまとめ先で決まり、出した帯は消さないので、
+   * 測定点が分かる（読めなかった場合も含む）までは帯を出さない。先に出すと、全地点を抱えた古い帯が残って二重になる。
+   * 地図の点は2つの道のりで共有するので、kind の道のりを見ているときだけ置き換える（後から届いた別の道のりの点で上書きしない）
+   */
+  private showSurvey(
+    kind: Trail,
+    survey: Survey,
+    water: WaterOnPath[] | undefined,
+    pts: LngLat[],
+    k: number,
+  ): TimelineEvent[] {
+    if (this.showing === kind) {
+      const s = this.surveyOnMap;
+      if (s.pts !== pts) s.on = undefined; // 別の道のりに移ったら、押した点の目立たせはやめる
+      s.pts = pts;
+      s.dots = [...survey.water, ...survey.citizen].filter((d) => d.step <= k);
+      this.layers.showSurvey(s.dots, pts, s.on);
+    }
+    if (!water) return [];
+    return citizenBands(
+      survey.citizen,
+      water.map((w) => w.step),
+      k,
+    );
   }
 
   /**
@@ -411,7 +490,8 @@ export class Rain {
     // 水源の市区町村（未着なら undefined のまま「水源」と出す）
     let sourcePlace: Place | null | undefined;
     let dams: DamOnPath[] = [];
-    let water: WaterOnPath[] = [];
+    let water: WaterOnPath[] | undefined;
+    let survey: Survey = { water: [], citizen: [] };
     let reached = -1;
     const reveal = (k: number) => {
       if (!alive()) return;
@@ -421,9 +501,12 @@ export class Rain {
         origin,
         sourcePlace,
         dams,
-        water,
+        water ?? [],
       ).filter((ev) => ev.step <= k);
-      this.sourceTimeline.add(events);
+      this.sourceTimeline.add([
+        ...events,
+        ...this.showSurvey("source", survey, water, src.pts, k),
+      ]);
       this.layers.showConfluences(events, src.pts);
     };
     originPlace.then((p) => {
@@ -437,11 +520,15 @@ export class Rain {
       })
       .catch(() => {});
     waterAlong(src)
+      .catch(() => [])
       .then((list) => {
         water = list;
         reveal(reached);
-      })
-      .catch(() => {});
+      });
+    surveyAlong(src).then((s) => {
+      survey = s;
+      reveal(reached);
+    });
     placesAlong(src).then((a) => {
       places = a.places;
       if (!src.cut) sourcePlace = a.last;

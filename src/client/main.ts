@@ -490,7 +490,18 @@ async function main() {
     setData(map, "rivers", { type: "FeatureCollection", features }),
   );
   map.getCanvas().style.cursor = "crosshair";
-  map.on("click", (e) => onClick([e.lngLat.lng, e.lngLat.lat]));
+  // 調査地点の点を押したときは中身を出すだけにし（ui/trail-layers.ts）、そこから雨をたどり直さない
+  const onSurvey = (p: maplibregl.PointLike) =>
+    map.queryRenderedFeatures(p, { layers: ["survey"] }).length > 0;
+  map.on("click", (e) => {
+    if (!onSurvey(e.point)) onClick([e.lngLat.lng, e.lngLat.lat]);
+  });
+  map.on("mouseenter", "survey", () => {
+    map.getCanvas().style.cursor = "pointer";
+  });
+  map.on("mouseleave", "survey", () => {
+    map.getCanvas().style.cursor = "crosshair";
+  });
   // 地図が止まってから少し待って、表示範囲の川の読み込みと自動計算をする。
   // 雨粒を追うカメラは毎フレーム地図を動かすので、そのたびに走らせない
   let settle: ReturnType<typeof setTimeout> | undefined;

@@ -21,6 +21,10 @@
   --color-water: #238fbe; /* 川・合流 */
   --color-water-strong: #0c4a6e; /* 川の名前の文字 */
   --color-water-soft: #e0f0f8; /* 合流の帯の背景 */
+  /* 調査地点の色の段階（きれい寄り・なか・よごれ寄り）。地図の点と、時系列の市民の調査の帯 */
+  --color-survey-0: #3b9d5d;
+  --color-survey-1: #d39b22;
+  --color-survey-2: #d0453a;
   --color-drop: #d6336c; /* 雨粒と下流の線。主操作の色も兼ねる */
   --color-drop-soft: #fce8ef; /* 進み具合のバーの地 */
   --color-basin: #e8590c; /* クリック地点の集水域 */

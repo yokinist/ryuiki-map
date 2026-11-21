@@ -1,5 +1,8 @@
 import type { DamOnPath } from "../data/karte-stats";
+import { codGrade } from "../data/mizumap";
 import { type Place, type PlaceEvent, placeName } from "../data/places";
+import { suiseiLabel } from "../data/suisei";
+import type { SurveyOnPath } from "../data/survey-points";
 import {
   trendNote,
   WATER_SCORE_MAX,
@@ -10,13 +13,96 @@ import type { Path } from "../terrain/trace";
 import { el } from "./dom";
 import { distance, eta, km } from "./format";
 
+/**
+ * 地図に点で置く調査地点1つ（環境省の測定点 water・市民の調査地点 citizen）。
+ * tone は色の段階（0 きれい寄り・1 なか・2 よごれ寄り）、text は押したときに出す中身
+ */
+export interface SurveyDot {
+  step: number;
+  kind: "water" | "citizen";
+  tone: number;
+  text: string;
+}
+
+const month = (date: string) => {
+  const [y, m] = date.split("-").map(Number);
+  return `${y}年${m}月`;
+};
+
+/** 水生生物調査の水質階級 1〜4 → 色の段階。「ややきれいな水」までは きれい寄りにする */
+const suiseiTone = (grade: number) => [0, 0, 1, 2][grade - 1];
+
+/**
+ * BOD 年平均 mg/L → 色の段階。境目は河川の環境基準の A（2 以下。ヤマメ・イワナ）と C（5 以下。コイ・フナ）。
+ * 市民の水質調べの COD の境目（3・6）とおおよそ揃う
+ */
+const waterTone = (bod: number) => (bod <= 2 ? 0 : bod <= 5 ? 1 : 2);
+
+/** 川の生きもの調べ・市民の水質調べの地点を、流路の順に色の点にする */
+export function citizenDots(
+  suisei: SurveyOnPath[],
+  mizumap: SurveyOnPath[],
+): SurveyDot[] {
+  return [
+    ...suisei.map((s) => ({
+      step: s.step,
+      kind: "citizen" as const,
+      tone: suiseiTone(s.value),
+      text: `${s.name}・${suiseiLabel(s.value)}（川の生きもの調べ・${month(s.date)}）`,
+    })),
+    ...mizumap.map((s) => ({
+      step: s.step,
+      kind: "citizen" as const,
+      tone: codGrade(s.value).level,
+      text: `${s.name}・${codGrade(s.value).label}・COD ${s.value}（市民の水質調べ・${month(s.date)}）`,
+    })),
+  ].sort((a, b) => a.step - b.step);
+}
+
+/** 環境省の測定点を、流路の順に色の点にする */
+export function waterDots(stations: WaterOnPath[]): SurveyDot[] {
+  return stations.map((w) => ({
+    step: w.step,
+    kind: "water" as const,
+    tone: waterTone(w.bod),
+    text: `${w.name}・${w.label}・BOD ${w.bod}（${w.year}年度の平均・環境省）`,
+  }));
+}
+
+/**
+ * 市民の調査地点を、その手前の環境省の測定点（anchors は流路の位置）ごとに1つの帯にまとめる。
+ * 最初の測定点より上流の地点は、最初の地点の位置にまとめる。雨粒がまだ着いていない地点（k より先）は入れない
+ */
+export function citizenBands(
+  dots: SurveyDot[],
+  anchors: number[],
+  k: number,
+): TimelineEvent[] {
+  const groups = new Map<number, SurveyDot[]>();
+  const reached = dots.filter((d) => d.step <= k);
+  for (const d of reached) {
+    const at = anchors.findLast((a) => a <= d.step) ?? reached[0].step;
+    groups.set(at, [...(groups.get(at) ?? []), d]);
+  }
+  return [...groups].map(([step, group]) => ({
+    id: `c${step}`,
+    step,
+    kind: "band" as const,
+    title: `市民の調査 ${group.length}地点`,
+    sub: "点を押すと場所と結果",
+    dots: group,
+  }));
+}
+
 export interface TimelineEvent {
   id: string;
   /** 流路上の位置（Path.pts の添字）。この順に並べる */
   step: number;
-  kind: "place" | "river" | "branch" | "dam" | "water" | "end";
+  kind: "place" | "river" | "branch" | "dam" | "water" | "band" | "end";
   title: string;
   sub: string;
+  /** 市民の調査地点を色の点で並べる帯の点 */
+  dots?: SurveyDot[];
   /** 水のきれいさの点数（1〜WATER_SCORE_MAX）。あればメーターにして出す */
   score?: number;
   /** 水のきれいさの推移の一言（「1994年度より よくなった」と「BOD 9.3 → 3.4」）。比べる年度がなければ undefined */
@@ -242,9 +328,10 @@ export class Timeline {
   }
 }
 
-// 同じ地点なら「川に合流」→ ダム → 水のきれいさ → 地名の順に
+// 同じ地点なら「川に合流」→ ダム → 水のきれいさ → 市民の調査の帯 → 地名の順に
+const RANK: TimelineEvent["kind"][] = ["river", "dam", "water", "band"];
 const rank = (ev: TimelineEvent) =>
-  ev.kind === "river" ? 0 : ev.kind === "dam" ? 1 : ev.kind === "water" ? 2 : 3;
+  RANK.includes(ev.kind) ? RANK.indexOf(ev.kind) : RANK.length;
 
 function item(ev: TimelineEvent) {
   const li = el(
@@ -252,6 +339,7 @@ function item(ev: TimelineEvent) {
     { className: `timeline__item timeline__item--${ev.kind}` },
     el("b", { className: "timeline__title", textContent: ev.title }),
     ...(ev.score ? [meter(ev.score)] : []),
+    ...(ev.dots ? [dotRow(ev.dots)] : []),
     el("small", { className: "timeline__sub", textContent: ev.sub }),
     ...(ev.note && ev.history
       ? [
@@ -274,6 +362,33 @@ function item(ev: TimelineEvent) {
   );
   li.dataset.step = String(ev.step);
   return li;
+}
+
+/**
+ * 市民の調査の点の帯。点を押すと、帯の下の添え書きをその地点の中身にし、"survey-dot"（detail はその点）を投げる。
+ * 地図の同じ点を目立たせるのに使う
+ */
+function dotRow(dots: SurveyDot[]) {
+  const row = el("span", { className: "timeline__dots" });
+  for (const d of dots) {
+    const b = el("button", {
+      type: "button",
+      className: "timeline__dot",
+      ariaLabel: d.text,
+      title: d.text,
+    });
+    b.dataset.tone = String(d.tone);
+    b.addEventListener("click", () => {
+      const sub = b.closest("li")?.querySelector(".timeline__sub");
+      if (sub) sub.textContent = d.text;
+      for (const o of row.children) o.classList.toggle("is-on", o === b);
+      b.dispatchEvent(
+        new CustomEvent("survey-dot", { bubbles: true, detail: d }),
+      );
+    });
+    row.append(b);
+  }
+  return row;
 }
 
 /**
@@ -328,5 +443,14 @@ function setText(li: HTMLLIElement, ev: TimelineEvent) {
   const title = li.children[0];
   const sub = li.querySelector(".timeline__sub") as Element;
   if (title.textContent !== ev.title) title.textContent = ev.title;
+  if (ev.dots) {
+    // 雨粒が進むと帯の点が増える。点を押して出した中身はそのまま残す
+    const row = li.querySelector(".timeline__dots") as Element;
+    if (row.children.length !== ev.dots.length) {
+      row.replaceWith(dotRow(ev.dots));
+      title.textContent = ev.title;
+    }
+    return;
+  }
   if (sub.textContent !== ev.sub) sub.textContent = ev.sub;
 }

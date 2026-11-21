@@ -1,8 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { PlaceEvent } from "../data/places";
+import { waterGrade } from "../data/water";
 import type { Path } from "../terrain/trace";
 import { distance } from "./format";
-import { mouthName, sourceEvents, timelineEvents } from "./timeline";
+import {
+  citizenBands,
+  mouthName,
+  sourceEvents,
+  timelineEvents,
+  waterDots,
+} from "./timeline";
 
 // 4点の流路。片品川を下りはじめ、2点目で利根川に合流して海へ
 const path: Path = {
@@ -222,6 +229,58 @@ describe("sourceEvents", () => {
       score: 4, // BOD 4.2
       note: { text: "1994年度より よくなった", values: "BOD 9.3 → 4.2" },
       sub: "大正橋で測定・BOD 4.2（2024年度の平均）・2.0 km上流・約33分前",
+    });
+  });
+});
+describe("citizenBands", () => {
+  const dot = (step: number, tone = 0) => ({
+    step,
+    kind: "citizen" as const,
+    tone,
+    text: `地点${step}`,
+  });
+
+  it("市民の調査地点を、その手前の環境省の測定点の位置にまとめる（最初の測定点より上流の地点は、最初の地点の位置にまとめる）", () => {
+    const bands = citizenBands([dot(1), dot(3), dot(5), dot(9)], [4, 8], 10);
+    expect(bands.map((b) => [b.step, b.dots?.map((d) => d.step)])).toEqual([
+      [1, [1, 3]],
+      [4, [5]],
+      [8, [9]],
+    ]);
+  });
+
+  it("雨粒がまだ着いていない地点（k より先）は入れない", () => {
+    const bands = citizenBands([dot(1), dot(3), dot(5)], [], 3);
+    expect(bands.map((b) => b.dots?.map((d) => d.step))).toEqual([[1, 3]]);
+  });
+
+  it("まとめた地点の数を見出しにする", () => {
+    const [band] = citizenBands([dot(1), dot(2)], [], 5);
+    expect(band).toMatchObject({ kind: "band", title: "市民の調査 2地点" });
+  });
+});
+
+describe("waterDots", () => {
+  const station = (bod: number) => ({
+    step: 2,
+    name: "大正橋",
+    bod,
+    year: 2024,
+    ...waterGrade(bod),
+    history: [{ year: 2024, bod }],
+  });
+
+  it("環境省の測定点を、BOD で3つの色の段階に分ける（2以下・5以下・5より上。河川の環境基準の A と C の上限）", () => {
+    expect(
+      waterDots([0.5, 2, 2.1, 5, 5.1].map(station)).map((d) => d.tone),
+    ).toEqual([0, 0, 1, 1, 2]);
+  });
+
+  it("押したときに出す中身は、地点名・きれいさの言葉・BOD・年度", () => {
+    expect(waterDots([station(1.6)])[0]).toMatchObject({
+      step: 2,
+      kind: "water",
+      text: "大正橋・ヤマメ・イワナが棲めるくらい・BOD 1.6（2024年度の平均・環境省）",
     });
   });
 });
