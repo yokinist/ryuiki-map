@@ -350,6 +350,8 @@ function refreshIdleStatus() {
 }
 
 async function onClick(p: LngLat, up = false) {
+  going++; // 検索で動かしている途中なら、着いたあとの案内を出さない
+  searched?.remove();
   if (!inBBox(p, JAPAN_BBOX)) {
     rain.clear();
     rain.notifyAt(p, "日本国内の陸地をクリックしてください");
@@ -358,8 +360,6 @@ async function onClick(p: LngLat, up = false) {
   }
   const id = ++clicks;
   clicking = true;
-  going++; // 検索で動かしている途中なら、着いたあとの案内を出さない
-  searched?.remove();
   try {
     rain.prepare(p); // すぐに雨粒を置き、パネルに「調べています」を出す
     // 大きく引いた状態のまま追いかけカメラが動き出すと、パンとズームが追いつかず
