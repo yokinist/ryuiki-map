@@ -479,23 +479,40 @@ function keepPreview() {
   }).catch(() => {});
 }
 
-/** 今の水の流れ（地点と向き）のURLをコピーし、リンク自体で結果を返す */
+/**
+ * 今の水の流れ（地点と向き）の URL を共有する。スマホなど指で操作する画面では OS の共有シートを開き、
+ * それ以外は URL をコピーして、ボタンの文言で結果を返す
+ */
 let copied: ReturnType<typeof setTimeout> | undefined;
 async function onShare() {
   keepPreview();
-  const ok = await navigator.clipboard.writeText(location.href).then(
+  const url = location.href;
+  if (navigator.share && matchMedia("(pointer: coarse)").matches) {
+    const s = rain.summary;
+    // 共有シートを閉じた（AbortError）ときは何もしない
+    await navigator
+      .share({
+        title: document.title,
+        text: s ? `${s.headline}（${s.distance}）` : undefined,
+        url,
+      })
+      .catch(() => {});
+    return;
+  }
+  const ok = await navigator.clipboard.writeText(url).then(
     () => true,
     () => false,
   );
+  const label = $("share-label");
   share.dataset.copied = ok ? "ok" : "failed";
-  share.textContent = ok
+  label.textContent = ok
     ? "✓ リンクをコピーしました"
     : "コピーできませんでした。アドレスバーのURLを共有してください";
-  $("announce").textContent = share.textContent;
+  $("announce").textContent = label.textContent;
   clearTimeout(copied);
   copied = setTimeout(() => {
     delete share.dataset.copied;
-    share.textContent = "この結果を共有する";
+    label.textContent = "この結果を共有する";
   }, 2500);
 }
 

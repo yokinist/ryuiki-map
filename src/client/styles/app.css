@@ -229,34 +229,42 @@ p {
 .button--secondary:hover {
   background: var(--color-water-soft);
 }
-/* 共有はもう主操作ではないので、下線だけの控えめなリンクにする */
-.button--link {
-  display: block;
-  width: fit-content;
-  margin-top: var(--space-3);
-  margin-left: auto;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--color-ink-muted);
+/* 共有は結論のすぐ下に置く小さな枠付きのボタン。共有ボタンから共有するとプレビューに結果が出るので、目に入るようにする */
+.button--share {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+  padding: 5px var(--space-3);
+  border: 1px solid var(--color-drop);
+  /* コピーできなかったときの案内は2行になるので、丸すぎない角にする */
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-drop);
+  text-align: left;
   font-size: var(--font-size-sm);
-  text-decoration: underline;
-  text-underline-offset: 2px;
+  font-weight: var(--font-weight-medium);
+  transition: background var(--duration-fast) var(--ease-out);
   animation: settle var(--duration-slow) var(--ease-out);
 }
-/* display: block は hidden 属性（非表示）より強いので、隠すときは明示する */
-.button--link[hidden] {
+/* display: inline-flex は hidden 属性（非表示）より強いので、隠すときは明示する */
+.button--share[hidden] {
   display: none;
 }
-.button--link:hover,
-.button--link:focus-visible {
-  color: var(--color-water-strong);
+.button--share:hover {
+  background: var(--color-drop-soft);
+}
+.button__icon {
+  width: 1em;
+  height: 1em;
 }
 /* コピーできたら色を変えて、押した結果をボタン自体で返す */
-.button--link[data-copied="ok"] {
+.button--share[data-copied="ok"] {
+  border-color: var(--color-water);
   color: var(--color-water-strong);
 }
-.button--link[data-copied="failed"] {
+.button--share[data-copied="failed"] {
+  border-color: var(--color-warn);
   color: var(--color-warn);
 }
 .button:focus-visible,
