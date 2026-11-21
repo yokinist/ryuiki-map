@@ -20,8 +20,6 @@ export function setupSearch(onPick: (hit: SearchHit) => void) {
           ariaSelected: String(i === active),
           textContent: h.label,
         });
-        // 押した瞬間に入力欄のフォーカスが外れて候補が消えないように
-        option.addEventListener("pointerdown", (e) => e.preventDefault());
         option.addEventListener("click", () => pick(i));
         return option;
       }),
@@ -30,7 +28,7 @@ export function setupSearch(onPick: (hit: SearchHit) => void) {
         : []),
     );
     list.hidden = !hits.length && !note;
-    input.ariaExpanded = String(hits.length > 0);
+    input.ariaExpanded = String(!list.hidden);
     if (active >= 0)
       input.setAttribute("aria-activedescendant", `search-${active}`);
     else input.removeAttribute("aria-activedescendant");
@@ -49,8 +47,13 @@ export function setupSearch(onPick: (hit: SearchHit) => void) {
     if (!hit) return;
     input.value = hit.label;
     close();
+    // スマホではキーボードを閉じ、移った先の地図が隠れないようにする
+    if (matchMedia("(pointer: coarse)").matches) input.blur();
     onPick(hit);
   };
+
+  // 候補やスクロールバーを押した瞬間に入力欄のフォーカスが外れて、候補が消えないように
+  list.addEventListener("pointerdown", (e) => e.preventDefault());
 
   let typed = 0;
   input.addEventListener("input", async () => {
