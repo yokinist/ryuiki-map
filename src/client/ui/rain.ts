@@ -36,18 +36,16 @@ import {
   reducedMotion,
 } from "./motion";
 import { SummaryActions } from "./summary-actions";
+import { citizenDots, type SurveyDot, waterDots } from "./survey-dots";
 import {
   citizenBands,
-  citizenDots,
   type Mouth,
   mouthName,
   type SourcePath,
-  type SurveyDot,
   sourceEvents,
   Timeline,
   type TimelineEvent,
   timelineEvents,
-  waterDots,
 } from "./timeline";
 
 import { TrailLayers } from "./trail-layers";
