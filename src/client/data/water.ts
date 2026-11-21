@@ -1,13 +1,9 @@
 // 水のきれいさ。環境省「公共用水域水質測定結果」の河川の BOD 年平均から作った表（public/water/）で、通り道のそばの測定点を引く
 import { SOURCES } from "../config";
 import type { LngLat } from "../geo";
-import { meshOf } from "./karte-format";
 import { nearestOnPath } from "./karte-stats";
-import {
-  WATER_PAST_YEARS,
-  type WaterIndex,
-  type WaterRow,
-} from "./water-format";
+import { meshFiles, rowsAlong } from "./mesh-files";
+import { WATER_PAST_YEARS, type WaterRow } from "./water-format";
 
 export type { WaterRow };
 
@@ -186,61 +182,19 @@ export function waterGrade(bod: number): { level: number; label: string } {
     : { level, label: GRADES[level][1] };
 }
 
-// ---- 配信場所: /water/latest.json が今の版を指す（地名の /munis/ と同じ形） ----
-let index: Promise<{ url: string; has: Set<number> }> | null = null;
-const files = new Map<number, Promise<WaterRow[]>>();
-
-function waterIndex() {
-  index ??= fetch(`${SOURCES.water}/latest.json`)
-    .then((r) =>
-      r.ok ? r.json() : Promise.reject(new Error(String(r.status))),
-    )
-    .then(async ({ version }: { version: string }) => {
-      const url = `${SOURCES.water}/${version}`;
-      const i: WaterIndex = await fetch(`${url}/index.json`).then((r) =>
-        r.json(),
-      );
-      return { url, has: new Set(i.meshes) };
-    })
-    .catch((err) => {
-      // 読めなかったときは覚えずに、次の呼び出しでまた取りに行く。空で解決すると、そのメッシュを「測定点なし」として
-      // waterFile が覚えてしまい、流域サマリも失敗を「ない」と出すので、失敗のまま伝える
-      index = null;
-      throw err;
-    });
-  return index;
-}
-
-/** 1次メッシュ1つ分の測定点。ないメッシュ（海・測定点のない山地など）は空 */
-function waterFile(m1: number): Promise<WaterRow[]> {
-  let file = files.get(m1);
-  if (!file) {
-    file = waterIndex().then(async ({ url, has }) => {
-      if (!has.has(m1)) return [];
-      const res = await fetch(`${url}/${m1}.json`);
-      if (!res.ok) throw new Error(String(res.status));
-      return res.json();
-    });
-    file.catch(() => files.delete(m1)); // 失敗は覚えずに、次の呼び出しでまた取りに行く
-    files.set(m1, file);
-  }
-  return file;
-}
+// ---- 配信場所: /water/latest.json が今の版を指す（形は data/mesh-files.ts） ----
+const waterFile = meshFiles<WaterRow>(SOURCES.water);
 
 /** 道のり沿いの測定点を、間引かずに全部（流域サマリ用）。道のりが通る1次メッシュのファイルだけを読む */
 export async function stationsAlong(
   path: Parameters<typeof stationsNearPath>[0],
 ): Promise<WaterOnPath[]> {
-  const m1s = [...new Set(path.pts.map(([x, y]) => meshOf(x, y).m1))];
-  const rows = await Promise.all(m1s.map(waterFile));
-  return stationsNearPath(path, rows.flat());
+  return stationsNearPath(path, await rowsAlong(waterFile, path.pts));
 }
 
 /** 道のり沿いの水のきれいさ。道のりが通る1次メッシュのファイルだけを読む */
 export async function waterAlong(
   path: Parameters<typeof waterNearPath>[0],
 ): Promise<WaterOnPath[]> {
-  const m1s = [...new Set(path.pts.map(([x, y]) => meshOf(x, y).m1))];
-  const rows = await Promise.all(m1s.map(waterFile));
-  return waterNearPath(path, rows.flat());
+  return waterNearPath(path, await rowsAlong(waterFile, path.pts));
 }
