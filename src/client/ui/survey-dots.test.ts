@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { waterGrade } from "../data/water";
-import { surveyDownstream, waterDots } from "./survey-dots";
+import { citizenDots, surveyDownstream, waterDots } from "./survey-dots";
 
 describe("waterDots", () => {
   const station = (bod: number) => ({
@@ -51,5 +51,26 @@ describe("surveyDownstream", () => {
 
   it("20km 以内に地点がなければ null", () => {
     expect(surveyDownstream([dot(4, 0)], dist)).toBeNull();
+  });
+});
+
+describe("citizenDots", () => {
+  const s = (value: number, date = "2025-06-08") => ({
+    step: 1,
+    name: "大師橋",
+    value,
+    date,
+  });
+
+  it("帯に並べる短い中身は、場所と結果だけ（COD は値も）。押したときの中身には調査の名前と年月も添える", () => {
+    // 同じ位置なら生きもの調べ・水質調べの順
+    const [bio, cod] = citizenDots([s(2, "2025-07-26")], [s(3)]);
+    expect([bio.short, cod.short]).toEqual([
+      "大師橋・ややきれいな水",
+      "大師橋・少しよごれている（COD 3）",
+    ]);
+    expect(cod.text).toBe(
+      "大師橋・少しよごれている・COD 3（市民の水質調べ・2025年6月）",
+    );
   });
 });

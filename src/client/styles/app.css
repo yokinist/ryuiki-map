@@ -491,6 +491,30 @@ button.survey-dot {
 .survey-dot.is-on {
   outline: 2px solid var(--color-water-strong);
 }
+/* 地点が少ない帯は、色の点と中身を1行ずつ並べる */
+.survey-list {
+  margin: 3px 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-tight);
+}
+.survey-list li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  margin-top: 2px;
+}
+.survey-list .survey-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-width: 1px;
+}
+.timeline__item--band .timeline__sub:empty {
+  display: none;
+}
 /* 支流の合流（水の来た道）は、たどっている川の名前が変わるわけではないので輪だけにして控えめに */
 .timeline__item--branch::before {
   border-color: var(--color-water);
