@@ -6,7 +6,8 @@ import { pixel } from "../map/theme";
 import type { Grid } from "../terrain/grid";
 import { upstream } from "../terrain/hydro";
 import { el } from "./dom";
-import type { SurveyDot, TimelineEvent } from "./timeline";
+import type { SurveyDot } from "./survey-dots";
+import type { TimelineEvent } from "./timeline";
 
 type Line = "downstream" | "upstream";
 
