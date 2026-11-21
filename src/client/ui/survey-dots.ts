@@ -59,3 +59,22 @@ export function waterDots(stations: WaterOnPath[]): SurveyDot[] {
     text: `${w.name}・${w.label}・BOD ${w.bod}（${w.year}年度の平均・環境省）`,
   }));
 }
+
+/** 流域サマリで市民の調査をまとめる、クリック地点からの距離 m。水のきれいさ（data/water.ts の測定点）と同じ範囲 */
+const DOWNSTREAM_M = 20_000;
+
+/**
+ * 流域サマリの市民の調査。dots（流路の順）のうち、この地点から下流 DOWNSTREAM_M 以内のものを色の段階ごとに数え、
+ * いちばん近い地点とそこまでの流路長 m を添える。1つもなければ null（dist は各点までの流路長 m）
+ */
+export function surveyDownstream(dots: SurveyDot[], dist: number[]) {
+  const near = dots.filter((d) => dist[d.step] <= DOWNSTREAM_M);
+  if (!near.length) return null;
+  const tones = [0, 0, 0];
+  for (const d of near) tones[d.tone]++;
+  return {
+    dots: near,
+    tones,
+    nearest: { dot: near[0], m: dist[near[0].step] },
+  };
+}

@@ -1,7 +1,9 @@
 // 流域サマリの画面。雨の流れをたどった地点について、海までと上流を1枚にまとめる
 import { type Karte, karteAt, landAlong, precipitation } from "../data/karte";
 import { CENSUS_YEARS, LAND } from "../data/karte-format";
+import { mizumapAlong } from "../data/mizumap";
 import { type Place, placeName } from "../data/places";
+import { suiseiAlong } from "../data/suisei";
 import {
   nearestStation,
   stationsAlong,
@@ -23,6 +25,7 @@ import {
   volumeDome,
   volumeSize,
 } from "./format";
+import { citizenDots, type SurveyDot, surveyDownstream } from "./survey-dots";
 
 /** 雨の通り道のうち、この地点から先（下流）の長さ */
 export interface Downstream {
@@ -45,6 +48,8 @@ interface Entry {
   rain?: number | null;
   /** すぐ下流の水質の測定点と、そこまでの流路長 m。読み込み中は undefined、近くになければ null、読めなければ "error" */
   water?: { station: WaterOnPath; m: number } | null | "error";
+  /** すぐ下流の市民の調査地点のまとめ。読み込み中は undefined、近くになければ null、読めなければ "error" */
+  citizen?: ReturnType<typeof surveyDownstream> | "error";
 }
 
 let entry: Entry | null = null;
@@ -120,6 +125,7 @@ export async function openKarte(
     along: undefined,
     rain: undefined,
     water: undefined,
+    citizen: undefined,
   };
   const e = entry;
 
@@ -133,6 +139,17 @@ export async function openKarte(
     .then((water) => {
       if (!entry || entry !== e) return;
       e.water = water;
+      render();
+    });
+
+  Promise.all([suiseiAlong(path), mizumapAlong(path)])
+    .then(([suisei, mizumap]) =>
+      surveyDownstream(citizenDots(suisei, mizumap), path.dist),
+    )
+    .catch(() => "error" as const)
+    .then((citizen) => {
+      if (!entry || entry !== e) return;
+      e.citizen = citizen;
       render();
     });
 
@@ -191,6 +208,40 @@ const LAND_PATH_HELP =
 
 const WATER_HELP =
   "環境省の公共用水域水質測定結果のうち、水のよごれの目安（BOD、小さいほどきれい）の年平均です。言葉は河川の環境基準の類型に合わせ、メーターと図は BOD を10段に分けたものです（上・多いほどきれい）。この地点から下流へ20km 以内で、いちばん近い測定点の値です。国が基準を満たしたかの判定は年平均ではなく75%値を使うので、ここでの言葉は国の判定より甘めになることがあります。";
+
+const CITIZEN_HELP =
+  "学校や市民団体などによる2つの調査の結果です。全国水生生物調査（川の生きものから水質を4つに判定）と、身近な水環境の全国一斉調査（毎年6月にパックテストで COD を測る）の、2023〜2025年の調査地点のうち、この地点から下流へ20km 以内のものを数えています。色は、緑がきれい寄り（生きもの調べの「きれいな水」「ややきれいな水」・COD 3未満）、黄がなか（「きたない水」・COD 6未満）、赤がよごれ寄りです。どちらも調べた日の結果で、地点は参加者が選ぶので、川の水質を代表するものではありません。";
+
+function citizenRow(e: Entry) {
+  if (e.citizen === undefined) return loadingRow("市民の調査");
+  if (e.citizen === "error")
+    return row("市民の調査", sub("取得できませんでした"));
+  if (e.citizen === null)
+    return row("市民の調査", sub("下流20km 以内に調査地点がありません"));
+  const { dots, tones, nearest } = e.citizen;
+  const where = nearest.m < 100 ? "すぐそば" : `${km(nearest.m)}下流`;
+  return helpRow(
+    "市民の調査",
+    CITIZEN_HELP,
+    big(`下流20km 以内に${dots.length}地点`),
+    surveyDotRow(dots),
+    sub(`きれい寄り ${tones[0]}・なか ${tones[1]}・よごれ寄り ${tones[2]}`),
+    sub(`いちばん近いのは${where}の${nearest.dot.text}`),
+  );
+}
+
+/** 調査地点を流路の順に色の点で並べる（時系列の帯と同じ見た目。ここでは押せない） */
+function surveyDotRow(dots: SurveyDot[]) {
+  return el(
+    "span",
+    { className: "survey-dots", ariaHidden: "true" },
+    ...dots.map((d) => {
+      const dot = el("span", { className: "survey-dot" });
+      dot.dataset.tone = String(d.tone);
+      return dot;
+    }),
+  );
+}
 
 function waterRow(e: Entry) {
   if (e.water === undefined) return loadingRow("水のきれいさ");
@@ -457,7 +508,7 @@ function card(e: Entry) {
       e.karte === undefined ? loadingRow("河口までの長さ") : mouthLengthRow(e),
       pathLandRow(e),
     ),
-    group("この地点の水", waterRow(e)),
+    group("この地点の水", waterRow(e), citizenRow(e)),
     group("この地点より上流", ...upstreamRows(e)),
   );
 }

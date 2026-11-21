@@ -311,11 +311,11 @@ function item(ev: TimelineEvent) {
  * 地図の同じ点を目立たせるのに使う
  */
 function dotRow(dots: SurveyDot[]) {
-  const row = el("span", { className: "timeline__dots" });
+  const row = el("span", { className: "survey-dots" });
   for (const d of dots) {
     const b = el("button", {
       type: "button",
-      className: "timeline__dot",
+      className: "survey-dot",
       ariaLabel: d.text,
       title: d.text,
     });
@@ -387,7 +387,7 @@ function setText(li: HTMLLIElement, ev: TimelineEvent) {
   if (title.textContent !== ev.title) title.textContent = ev.title;
   if (ev.dots) {
     // 雨粒が進むと帯の点が増える。点を押して出した中身はそのまま残す
-    const row = li.querySelector(".timeline__dots") as Element;
+    const row = li.querySelector(".survey-dots") as Element;
     if (row.children.length !== ev.dots.length) {
       row.replaceWith(dotRow(ev.dots));
       title.textContent = ev.title;

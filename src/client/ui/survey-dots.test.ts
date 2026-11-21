@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { waterGrade } from "../data/water";
-import { waterDots } from "./survey-dots";
+import { surveyDownstream, waterDots } from "./survey-dots";
 
 describe("waterDots", () => {
   const station = (bod: number) => ({
@@ -24,5 +24,32 @@ describe("waterDots", () => {
       kind: "water",
       text: "大正橋・ヤマメ・イワナが棲めるくらい・BOD 1.6（2024年度の平均・環境省）",
     });
+  });
+});
+
+describe("surveyDownstream", () => {
+  const dot = (step: number, tone: number) => ({
+    step,
+    kind: "citizen" as const,
+    tone,
+    text: `地点${step}`,
+  });
+  // 流路の各点までの長さ m
+  const dist = [0, 500, 8_000, 19_000, 25_000];
+
+  it("この地点から下流20km 以内の地点を、色の段階ごとに数え、いちばん近い地点と距離を返す", () => {
+    const s = surveyDownstream(
+      [dot(1, 0), dot(2, 1), dot(3, 0), dot(4, 2)],
+      dist,
+    );
+    expect(s).toMatchObject({
+      tones: [2, 1, 0],
+      nearest: { dot: { step: 1 }, m: 500 },
+    });
+    expect(s?.dots.map((d) => d.step)).toEqual([1, 2, 3]);
+  });
+
+  it("20km 以内に地点がなければ null", () => {
+    expect(surveyDownstream([dot(4, 0)], dist)).toBeNull();
   });
 });
