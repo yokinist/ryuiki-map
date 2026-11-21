@@ -52,6 +52,17 @@ describe("mouthName", () => {
       "千葉県銚子市 川口町一丁目の海岸",
     );
   });
+  it("川が市区町村の境なら両岸を並べ、町丁・字は省く（同じ都道府県なら2つ目の都道府県名も省く）", () => {
+    const kamisu = { pref: "茨城県", muni: "神栖市", aza: "波崎東部東町" };
+    expect(mouthName("利根川", kamisu, [choshi])).toBe(
+      "利根川河口（茨城県神栖市・千葉県銚子市）",
+    );
+    expect(
+      mouthName("淀川", { pref: "大阪府", muni: "大阪市此花区", aza: "酉島" }, [
+        { pref: "大阪府", muni: "大阪市西淀川区" },
+      ]),
+    ).toBe("淀川河口（大阪府大阪市此花区・大阪市西淀川区）");
+  });
 });
 
 describe("timelineEvents", () => {

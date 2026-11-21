@@ -62,13 +62,23 @@ export interface Mouth {
 
 /**
  * 河口の呼び名。「利根川河口（千葉県銚子市 川口町一丁目）」、川がなければ「千葉県銚子市 川口町一丁目の海岸」。
- * 市区町村 at がまだ分からなければ、分かっている部分だけ
+ * 市区町村 at がまだ分からなければ、分かっている部分だけ。
+ * 川が市区町村の境で、向こう岸 across があれば「利根川河口（茨城県神栖市・千葉県銚子市）」と並べる
  */
 export function mouthName(
   river: string | undefined,
   at: Pick<Place, "pref" | "muni" | "aza"> | null,
+  across: Pick<Place, "pref" | "muni">[] = [],
 ): string | null {
-  const where = at ? placeName(at) : "";
+  const where = !at
+    ? ""
+    : across.length
+      ? [at, ...across]
+          .map((p, i, all) =>
+            i && p.pref === all[i - 1].pref ? p.muni : `${p.pref}${p.muni}`,
+          )
+          .join("・")
+      : placeName(at);
   if (river) return `${river}河口${where ? `（${where}）` : ""}`;
   return where ? `${where}の海岸` : null;
 }

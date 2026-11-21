@@ -277,9 +277,9 @@ export class Rain {
         })
       : Promise.resolve();
     if (path.toSea)
-      Promise.all([along, mouthReady]).then(([{ last: at }]) => {
+      Promise.all([along, mouthReady]).then(([{ last: at, across }]) => {
         if (!alive() || !at || !mouth) return;
-        mouth = { ...mouth, name: mouthName(lastRiver, at) };
+        mouth = { ...mouth, name: mouthName(lastRiver, at, across) };
         reveal(reached);
         // 見出しは今その道のりを見ているときだけ書き換える（水の来た道を見ている間に上書きしない）
         if (arrived && this.showing === "route")

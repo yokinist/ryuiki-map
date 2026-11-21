@@ -178,6 +178,20 @@ async function areaNear(
   return k ? file.areas[k - 1] : null;
 }
 
+/** 地点から r マス以内にある、名前のある町丁・字等の市区町村コード（小さい順） */
+async function munisNear([x, y]: LngLat, r: number): Promise<number[]> {
+  const { grid } = await placeIndex();
+  const { m1, i, j } = cellOf(x, y, grid);
+  const file = await placeFile(m1).catch(() => null);
+  if (!file) return [];
+  const areas = areasNear((row) => rowOf(file, grid, row), i, j, r, grid).map(
+    (k) => file.areas[k - 1],
+  );
+  return [...new Set(areas.filter(([, n]) => n).map(([c]) => c))].sort(
+    (a, b) => a - b,
+  );
+}
+
 /**
  * 出発点の町丁・字等。そのマスがどこにも入らないとき（県の境の川などで、元データの区域の間に隙間がある）は、
  * 周り NEAR_CELLS まで近い輪から探す。表示（place）と道のり沿いの判定（placesAlong）で同じものを使う
@@ -192,27 +206,36 @@ export async function place(p: LngLat): Promise<Place | null> {
 
 /**
  * 道のり沿いで入った市区町村（出発点の市区町村は除く）と、道のりの最後（河口・水源）の市区町村と町丁・字等。
- * 河口・水源の町丁・字等は、最後の点を囲む輪を近い方から広げ、選んだ市区町村のものを探す（境界の川や尾根の上でも、流れてきた側）
+ * 河口・水源の町丁・字等は、最後の点を囲む輪を近い方から広げ、選んだ市区町村のものを探す（境界の川や尾根の上でも、流れてきた側）。
+ * across は最後の点の近くにある別の市区町村（境界の川の河口なら向こう岸）
  */
 export async function placesAlong(
   path: Pick<Path, "pts" | "dist">,
-): Promise<{ places: PlaceEvent[]; last: Place | null }> {
+): Promise<{ places: PlaceEvent[]; last: Place | null; across: Place[] }> {
   const [codes, here] = await Promise.all([
     codesAt(path.pts, NEAR_CELLS),
     originArea(path.pts[0]),
   ]);
   const { changes, last, lastStep } = muniChanges(codes, path.dist, here?.[0]);
   const places = await Promise.all(changes.map((c) => toPlace(c.code)));
-  const end =
+  const [end, near] =
     last === undefined
-      ? null
-      : // 河口は水面（名前のない水面調査区）に入りやすいので、名前のある町丁・字等を探す
-        await areaNear(
-          path.pts[lastStep],
-          END_CELLS,
-          ([c, name]) => c === last && name !== "",
-        );
+      ? [null, []]
+      : await Promise.all([
+          // 河口は水面（名前のない水面調査区）に入りやすいので、名前のある町丁・字等を探す
+          areaNear(
+            path.pts[lastStep],
+            END_CELLS,
+            ([c, name]) => c === last && name !== "",
+          ),
+          // ponytail: 最後の点から END_CELLS 以内にある別の市区町村を向こう岸とみなす。境が川でなくても河口のすぐそばにあれば並ぶ
+          munisNear(path.pts[lastStep], END_CELLS),
+        ]);
+  const across = await Promise.all(
+    near.filter((c) => c !== last).map((c) => toPlace(c)),
+  );
   return {
+    across: across.filter((p) => p !== null),
     places: changes.flatMap((c, i) => {
       const p = places[i];
       return p ? [{ ...p, step: c.step }] : [];
