@@ -19,6 +19,14 @@ export interface JourneyUi {
 export class JourneyPanel {
   /** 出発点の説明（「出発点：」を付ける前の文字列） */
   private originText = "";
+  /** 出発点の地名（標高の説明を除いたもの）。まだ分からなければ空 */
+  private place = "";
+  /** 着いたときの結論。共有したときにプレビュー用に預ける。たどっている間は null */
+  private conclusion: {
+    headline: string;
+    distance: string;
+    where: string | null;
+  } | null = null;
 
   constructor(private readonly ui: JourneyUi) {}
 
@@ -43,6 +51,7 @@ export class JourneyPanel {
 
   /** 前の雨の結論と共有を消し、出発点を出し直す */
   reset(origin: string) {
+    this.place = "";
     this.ui.share.hidden = true;
     delete this.ui.journey.dataset.arrived;
     this.setOrigin(origin);
@@ -65,11 +74,13 @@ export class JourneyPanel {
 
   /** 地名が後から届いたときに、標高の説明の前に書き足す */
   prependOrigin(text: string) {
+    this.place = text;
     this.setOrigin(`${text}・${this.originText}`);
   }
 
   /** 雨粒が動き出す前の見出し。下るときもさかのぼるときも、結論が出るまでは同じ見た目（黒い見出しと進み具合のバー） */
   start(headline: string) {
+    this.conclusion = null;
     delete this.ui.journey.dataset.arrived;
     this.ui.share.hidden = true; // 共有はアクションボタンと一緒に、着いてから出す（conclude で）
     this.ui.headline.textContent = headline;
@@ -121,6 +132,13 @@ export class JourneyPanel {
     );
   }
 
+  /** 画面に出ている結論（出発点の地名と、見出し・距離・河口の地名）。着いていないか地名が分からなければ null */
+  get summary() {
+    return this.conclusion && this.place
+      ? { origin: this.place, ...this.conclusion }
+      : null;
+  }
+
   /** 読み上げる（地図上の吹き出しなど、見出しの外の知らせ） */
   announce(text: string) {
     this.ui.announce.textContent = text;
@@ -137,6 +155,7 @@ export class JourneyPanel {
     spoken: string | false,
   ) {
     this.ui.journey.dataset.arrived = "";
+    this.conclusion = { headline, distance, where: where ?? null };
     this.ui.headline.textContent = headline;
     this.ui.progress.replaceChildren(
       el("b", { textContent: distance }),

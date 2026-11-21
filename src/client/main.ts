@@ -462,9 +462,27 @@ function setupAbout() {
   }
 }
 
+/**
+ * 共有した結果を Worker（src/worker/index.ts）に預け、SNS などのプレビューのタイトルと説明を結果にする。
+ * 送るのは共有 URL の p・dir と画面に出ている結論の文字だけ。届かなくてもリンクはそのまま使えるので、失敗は無視する
+ */
+function keepPreview() {
+  const summary = rain.summary;
+  const now = new URLSearchParams(location.search);
+  const p = now.get("p");
+  if (!summary || !p) return;
+  fetch("/api/share", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ p, dir: now.get("dir"), ...summary }),
+    keepalive: true,
+  }).catch(() => {});
+}
+
 /** 今の水の流れ（地点と向き）のURLをコピーし、リンク自体で結果を返す */
 let copied: ReturnType<typeof setTimeout> | undefined;
 async function onShare() {
+  keepPreview();
   const ok = await navigator.clipboard.writeText(location.href).then(
     () => true,
     () => false,

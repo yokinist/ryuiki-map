@@ -1,0 +1,10 @@
+{
+  // Worker（src/worker/）の型チェック。型は wrangler types が書き出す worker-configuration.d.ts（コミットせず、pnpm typecheck が毎回作る）
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ESNext"],
+    "types": []
+  },
+  "include": ["src/worker", "worker-configuration.d.ts"],
+  "exclude": []
+}
