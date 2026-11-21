@@ -137,7 +137,7 @@ const areas: [number, string][] = [];
 const areaId = new Map<string, number>();
 const polys: Poly[] = [];
 /** 検索用の代表点。町丁・字等は e-Stat の代表点（X_CODE・Y_CODE）で、図形が複数あれば面積が最大のもの。
- * 市区町村は人口が最多の町丁・字等の代表点（役所の位置は元データにないので、中心街の目安にする） */
+ * 市区町村は人口が最多の町丁・字等（水面を除く。名前のない区域も含む）の代表点（役所の位置は元データにないので、中心街の目安にする） */
 const areaPoint = new Map<number, { x: number; y: number; size: number }>();
 const cityPoint = new Map<string, { x: number; y: number; size: number }>();
 const keepLarger = <K>(
@@ -164,10 +164,11 @@ for (const pref of PREFS) {
       areaId.set(key, area);
     }
     polys.push({ area, ...shapes[i] });
-    if (!name) return;
+    if (r.HCODE === WATER) return;
     const pt = { x: +r.X_CODE, y: +r.Y_CODE };
-    keepLarger(areaPoint, area, { ...pt, size: +r.AREA });
-    keepLarger(cityPoint, city, { ...pt, size: +r.JINKO });
+    // 町丁・字に分かれず、全域が名前のない1つの区域の町村（直島町・姫島村など）も、市区町村としては引けるようにする
+    keepLarger(cityPoint, city, { ...pt, size: +r.JINKO || 0 });
+    if (name) keepLarger(areaPoint, area, { ...pt, size: +r.AREA || 0 });
   });
 }
 console.log(
