@@ -463,30 +463,32 @@ p {
   font-size: var(--font-size-xs);
   font-weight: normal;
 }
-.timeline__dots {
+.survey-dots {
   display: flex;
   flex-wrap: wrap;
   gap: 3px;
   margin-top: 3px;
 }
-.timeline__dot {
+.survey-dot {
   width: 12px;
   height: 12px;
   padding: 0;
   border: 2px solid var(--color-surface);
   border-radius: var(--radius-full);
+}
+button.survey-dot {
   cursor: pointer;
 }
-.timeline__dot[data-tone="0"] {
+.survey-dot[data-tone="0"] {
   background: var(--color-survey-0);
 }
-.timeline__dot[data-tone="1"] {
+.survey-dot[data-tone="1"] {
   background: var(--color-survey-1);
 }
-.timeline__dot[data-tone="2"] {
+.survey-dot[data-tone="2"] {
   background: var(--color-survey-2);
 }
-.timeline__dot.is-on {
+.survey-dot.is-on {
   outline: 2px solid var(--color-water-strong);
 }
 /* 支流の合流（水の来た道）は、たどっている川の名前が変わるわけではないので輪だけにして控えめに */
