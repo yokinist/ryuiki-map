@@ -7,6 +7,8 @@ playwright-report/
 
 # caches
 *.tsbuildinfo
+# wrangler types が書き出す Worker の型（約600KB）。pnpm typecheck が毎回作るのでコミットしない
+worker-configuration.d.ts
 .vite/
 .wrangler
 

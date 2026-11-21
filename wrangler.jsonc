@@ -2,11 +2,21 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "ryuiki-map",
   "compatibility_date": "2026-09-01",
-  // ページと public/（河川・流域サマリのデータ含む）を静的アセットとして配るだけで、Worker のコードは持たない。
-  // OGP 画像のような動的なルートが要るときは main を足す
+  // ページと public/（河川・流域サマリのデータ含む）は静的アセットとして配る。
+  // Worker（src/worker/index.ts）が受けるのは run_worker_first のパスだけ: 共有した結果を預かる /api/share と、
+  // 共有 URL（/?p=…）のタイトル・説明を結果に差し替えるトップページ
+  "main": "src/worker/index.ts",
   "assets": {
-    "not_found_handling": "single-page-application"
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/", "/api/*"]
   },
+  // 共有した結果（画面に出ている結論の文字だけ）を、共有 URL の座標と向きを鍵に90日預ける。
+  // namespace はメンテナが Cloudflare に作ったもの（wrangler kv namespace create SHARES）。PR のプレビューの版も同じものを使う。
+  // 手元の pnpm dev は .wrangler/ のエミュレーションで、ここには書き込まない
+  "kv_namespaces": [
+    { "binding": "SHARES", "id": "c849a5a558354262a89322f91273b808" }
+  ],
   // PR ごとのプレビュー（wrangler versions upload --preview-alias）に pr-<番号>-ryuiki-map.<サブドメイン>.workers.dev を付ける。
   // 本番に出すのは wrangler deploy だけで、プレビューの版は本番に出ない
   "preview_urls": true

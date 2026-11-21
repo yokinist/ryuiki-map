@@ -50,7 +50,7 @@ pnpm build:places       # 地名の格子を e-Stat の町丁・字等別境界�
 
 ## しくみ
 
-サーバーはファイルを配るだけで、計算はすべてブラウザの中で行う。地形の読み込みと流れの計算は、画面が固まらないよう Web Worker で動かす。
+サーバーはほぼファイルを配るだけで、計算はすべてブラウザの中で行う（Worker のコードは、共有した結果を SNS などのプレビューに出す部分だけ）。地形の読み込みと流れの計算は、画面が固まらないよう Web Worker で動かす。
 
 ```mermaid
 flowchart LR
@@ -65,6 +65,7 @@ flowchart LR
 ```
 
 - Cloudflare は、事前に作った静的ファイル（全国の河川線を0.5°四方に分けたタイル、流域サマリ用の人口・土地・ダム、地名の格子、海域、フォント）を配るだけ
+- 共有ボタンを押すと、ブラウザが画面に出ている結論（出発点・河口や水源までの距離・河口の地名）を Worker に送り、Worker は共有 URL の座標と向きを鍵に KV へ90日預ける。共有 URL（`/?p=…`）を開くと、預かった結果があれば `<title>`・OG の説明・画像を結果に差し替えて返す（クローラーも人も同じ HTML を受け取る。流れの計算はブラウザでしかできないので、Worker は計算しない）。画像は [og-image](https://github.com/yokinist/og-image)（`simple-og-image.vercel.app`）の URL にし、大きな字で「瀬戸内海まで 9.9 km」のような結論、小さな字で出発点の市区町村・河口・時間を描かせる。預かった結果のない URL は静的な `og.png` のまま
 - 標高タイル・地図タイル（地理院）は、ブラウザが直接取りに行く。Open-Meteo は流域サマリを開いたときだけ1回問い合わせる
 
 ### 1. 流れの向きを決める
@@ -186,6 +187,9 @@ flowchart TD
 ## 構成
 
 ```
+src/worker/              Worker（サーバー側）。run_worker_first のパスだけ受ける
+  index.ts               共有した結果を預かる /api/share と、共有 URL のタイトル・説明の差し替え
+  share.ts               預かる結論の確かめと、プレビューの文言の組み立て（純粋関数）
 src/client/              ページ（ブラウザ側）
   main.ts                起動・地図・操作のつなぎ込み
   config.ts              起動時の表示範囲・計算範囲・データの URL などの設定
@@ -230,7 +234,8 @@ assets/                  配信しない素材（共有時の画像の右側の�
 public/                  静的ファイル（seas.json、_headers、地図の欧文フォント fonts/、アイコン・OGP 画像。河川タイル rivers/・流域サマリ karte/・地名の格子 places/・水質 water/・川の生きもの調べ suisei/・市民の水質調べ mizumap/ は生成物だが git で管理する）
 site.config.ts           サイト名・説明・URL・構造化データ。index.html の {{キー}} に差し込む
 site.files.ts            robots.txt・sitemap.xml・llms.txt（AI 向けのサイト説明）。ビルド時に書き出す
-wrangler.jsonc           Cloudflare Workers の設定。静的アセットを配るだけで Worker のコードは持たない
+wrangler.jsonc           Cloudflare Workers の設定（静的アセット・Worker・共有した結果を預ける KV）。Worker の型（worker-configuration.d.ts）は `pnpm typecheck` がこの設定から作る（コミットしない）
+tsconfig.worker.json     Worker の型チェック（Workers のランタイムの型。ページの DOM の型と分ける）
 .github/                 CI（型チェック・Lint・テスト・ビルド）、PR の自動レビュー、Issue・PR のひな形
 ```
 
@@ -272,6 +277,7 @@ wrangler.jsonc           Cloudflare Workers の設定。静的アセットを配
 | MapLibre GL JS | BSD-3-Clause | ビルド済みで再配布するときは著作権表示とライセンス文を添える | ビルドで同梱ライブラリのライセンス文を `/licenses.md` に書き出し（`vite.config.ts` の `build.license`）、アプリ内からリンク |
 | 欧文フォント（Open Sans Semibold） | Apache License 2.0（[openmaptiles/fonts](https://github.com/openmaptiles/fonts)） | 再配布するならライセンス文を添える | 地図の文字用に変換した版（[maplibre/demotiles](https://github.com/maplibre/demotiles)）を `/fonts/` で配信し、ライセンス文 `/fonts/Open Sans Semibold/LICENSE.txt` を添える |
 | OG 画像の文字（ヒラギノ角ゴシック） | macOS 同梱フォント | 画像にした文字はフォントの再配布にあたらない | 画像として描いただけで、フォントファイルは含めていない |
+| 共有した結果の画像（[og-image](https://github.com/yokinist/og-image)。文字は Noto Sans JP・Inter） | og-image は MIT、フォントは SIL Open Font License 1.1 | フォントを再配布するならライセンス文を添える | 画像は外部のサービスが描いて返す。このリポジトリにも配信物にもフォントファイルは含めていない |
 | 開発用ツール（Vite・Biome・Vitest・wrangler・geotiff など） | MIT など | — | 配信物に含まれない（`dist/licenses.md` に出てこない） |
 
 アクセス数は [Cloudflare Web Analytics](https://www.cloudflare.com/web-analytics/) で集計している。クッキーを使わず、個人を特定しない範囲（画面ごとの表示数・参照元・国・表示速度）だけを取る。計測タグは `site.config.ts` の `analyticsToken` があるときだけ、ビルドで `index.html` に入る（開発サーバーでは入らない）。PR のプレビューも同じビルドなので、ページを開いたホストが本番（`site.config.ts` の `url`）のときだけ計測を読み込む。アプリ内の「利用上の注意」と `/llms.txt` にも書いている。

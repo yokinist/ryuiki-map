@@ -154,6 +154,11 @@ export class Rain {
     this.camera?.dispose();
   }
 
+  /** 画面に出ている結論。共有したときにプレビュー用に預ける（main.ts の onShare） */
+  get summary() {
+    return this.panel.summary;
+  }
+
   clear() {
     this.stop();
     this.ui.result.hidden = true;
