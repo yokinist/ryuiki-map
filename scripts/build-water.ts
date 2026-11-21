@@ -18,21 +18,14 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { meshOf } from "../src/client/data/karte-format.ts";
-import {
-  decodeTile,
-  type RiverLine,
-  tileKey,
-} from "../src/client/data/river-format.ts";
-import {
-  nearestRiverName,
-  riverOfWaterArea,
-} from "../src/client/data/river-near.ts";
+import { riverOfWaterArea } from "../src/client/data/river-near.ts";
 import {
   WATER_PAST_YEARS,
   type WaterIndex,
   type WaterRow,
 } from "../src/client/data/water-format.ts";
 import { sleep } from "./overpass.ts";
+import { riverNameAt } from "./river-names.ts";
 
 const SITE = "https://water-pub.env.go.jp/water-pub/mizu-site/";
 const ZIP = `${SITE}zip_create`;
@@ -111,37 +104,8 @@ if (process.argv[2] !== "--pack")
   }
 
 // ---- 2. まとめる ----
-// 測定点がどの川にあるかは、配信している河川タイル（public/rivers/）の線でいちばん近いものの名前にする。
-// 河川線は OSM のもので、雨の通り道の川の名前と同じ出どころなので、名前が揃う
-const riverDir = join(
-  root,
-  "public",
-  "rivers",
-  JSON.parse(readFileSync(join(out, "..", "rivers", "latest.json"), "utf8"))
-    .version,
-);
-const tiles = new Map<string, RiverLine[]>();
-const tileLines = (key: string) => {
-  let lines = tiles.get(key);
-  if (!lines) {
-    const file = join(riverDir, `${key}.json`);
-    lines = existsSync(file)
-      ? decodeTile(JSON.parse(readFileSync(file, "utf8")))
-      : [];
-    tiles.set(key, lines);
-  }
-  return lines;
-};
 /** 川のそばとみなす距離 m。測定点の座標は秒単位（約30m）で、河川線も数十m ずれるので、少し広くとる */
 const RIVER_NEAR_M = 150;
-/** 線は最初の点があるタイルに入っているので、隣のタイルも含めた9枚から探す */
-function riverNameAt(lon: number, lat: number) {
-  const [tx, ty] = tileKey(lon, lat).split("_").map(Number);
-  const lines = [-1, 0, 1].flatMap((dx) =>
-    [-1, 0, 1].flatMap((dy) => tileLines(`${tx + dx}_${ty + dy}`)),
-  );
-  return nearestRiverName(lines, lon, lat, RIVER_NEAR_M);
-}
 
 /** CSV の河川の測定点（同じ地点の重なりは除く）。値は get(列名) で取る */
 function* readStations(file: string) {
@@ -197,7 +161,7 @@ for (let i = 0; i < 47; i++) {
       Number(get("nendo")),
       // 細い川は河川線がないことがあるので、そのときは水域名（「後沢川」など）から取る。
       // 名前が分からないままだと、本流のそばにある支流の測定点（「利根川合流前」など）を本流のものとして拾ってしまう
-      riverNameAt(lon, lat) ?? riverOfWaterArea(get("water")),
+      riverNameAt(lon, lat, RIVER_NEAR_M) ?? riverOfWaterArea(get("water")),
       pastBod,
     ];
     const { m1 } = meshOf(lon, lat);
