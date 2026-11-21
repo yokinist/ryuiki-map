@@ -1,11 +1,6 @@
 import type { DamOnPath } from "../data/karte-stats";
 import { type Place, type PlaceEvent, placeName } from "../data/places";
-import {
-  trendNote,
-  WATER_SCORE_MAX,
-  type WaterOnPath,
-  waterScore,
-} from "../data/water";
+import { WATER_SCORE_MAX, type WaterOnPath, waterScore } from "../data/water";
 import type { Path } from "../terrain/trace";
 import { el } from "./dom";
 import { distance, eta, km } from "./format";
@@ -56,10 +51,6 @@ export interface TimelineEvent {
   listed?: boolean;
   /** 水のきれいさの点数（1〜WATER_SCORE_MAX）。あればメーターにして出す */
   score?: number;
-  /** 水のきれいさの推移の一言（「1994年度より よくなった」と「BOD 9.3 → 3.4」）。比べる年度がなければ undefined */
-  note?: { text: string; values: string };
-  /** 水のきれいさの推移。年度ごとの BOD（古い順）。小さな折れ線にする */
-  history?: { year: number; bod: number }[];
 }
 
 export interface Mouth {
@@ -218,8 +209,6 @@ function alongEvents(
       kind: "water" as const,
       title: `水のきれいさ：${w.label}`,
       score: waterScore(w.bod),
-      note: trendNote(w.history),
-      history: w.history,
       sub: `${w.name}で測定・BOD ${w.bod}（${w.year}年度の平均）・${at(w.step)}`,
     })),
     ...dams.map((d) => ({
@@ -292,24 +281,6 @@ function item(ev: TimelineEvent) {
     ...(ev.score ? [meter(ev.score)] : []),
     ...(ev.dots ? [bandBody(ev.dots, ev.listed)] : []),
     el("small", { className: "timeline__sub", textContent: ev.sub }),
-    ...(ev.note && ev.history
-      ? [
-          el(
-            "small",
-            { className: "timeline__trend" },
-            sparkline(ev.history),
-            el(
-              "span",
-              { className: "timeline__trend-text" },
-              el("b", { textContent: ev.note.text }),
-              el("span", {
-                className: "timeline__trend-values",
-                textContent: ev.note.values,
-              }),
-            ),
-          ),
-        ]
-      : []),
   );
   li.dataset.step = String(ev.step);
   return li;
@@ -353,39 +324,6 @@ function dotRow(dots: SurveyDot[]) {
     row.append(b);
   }
   return row;
-}
-
-/**
- * 推移の小さな折れ線。横は年度、縦はきれいさの点数（上ほどきれい。メーターと同じ向き）。
- * 値は横の一言で読めるので、図は読み上げない
- */
-function sparkline(history: { year: number; bod: number }[]) {
-  const W = 56;
-  const H = 16;
-  const y0 = history[0].year;
-  const span = history[history.length - 1].year - y0 || 1;
-  const xy = history.map(({ year, bod }) => [
-    ((year - y0) / span) * (W - 4) + 2,
-    H - 2 - ((waterScore(bod) - 1) / (WATER_SCORE_MAX - 1)) * (H - 4),
-  ]);
-  const NS = "http://www.w3.org/2000/svg";
-  const svg = document.createElementNS(NS, "svg");
-  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-  svg.setAttribute("class", "sparkline");
-  svg.setAttribute("aria-hidden", "true");
-  const line = document.createElementNS(NS, "polyline");
-  line.setAttribute("points", xy.map((p) => p.join(",")).join(" "));
-  svg.append(line);
-  // 両端に点を置き、いつからいつまでの線かを分かりやすくする（最新の側を塗り、古い側は輪にする）
-  for (const [i, [cx, cy]] of [xy[0], xy[xy.length - 1]].entries()) {
-    const dot = document.createElementNS(NS, "circle");
-    dot.setAttribute("cx", String(cx));
-    dot.setAttribute("cy", String(cy));
-    dot.setAttribute("r", "2.5");
-    dot.setAttribute("class", i ? "sparkline__now" : "sparkline__then");
-    svg.append(dot);
-  }
-  return svg;
 }
 
 /** 小さなメーター。塗った数が点数（スクリーンリーダーには「10段階の7」のように読ませる） */

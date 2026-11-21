@@ -406,50 +406,6 @@ p {
 .trend-chart__value {
   fill: var(--color-ink);
 }
-/* 推移の一言と、その頭に置く小さな折れ線（線は川の色、文字は本文の淡い色） */
-.timeline__trend {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  margin-top: var(--space-1);
-  color: var(--color-ink-muted);
-  font-size: var(--font-size-xs);
-  line-height: var(--line-height-tight);
-}
-.timeline__trend-text {
-  display: flex;
-  flex-direction: column;
-}
-.timeline__trend-text b {
-  color: var(--color-ink);
-  font-weight: var(--font-weight-medium);
-}
-/* 値は途中で折り返さない（「BOD 4.9 →」で切れると読めない） */
-.timeline__trend-values {
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-.sparkline {
-  flex: none;
-  width: calc(var(--space-4) * 3.5);
-  height: var(--space-4);
-  overflow: visible;
-}
-.sparkline polyline {
-  fill: none;
-  stroke: var(--color-water);
-  stroke-width: 1.5;
-  stroke-linejoin: round;
-  stroke-linecap: round;
-}
-.sparkline__now {
-  fill: var(--color-water);
-}
-.sparkline__then {
-  fill: var(--color-surface);
-  stroke: var(--color-water);
-  stroke-width: 1.5;
-}
 /* 水のきれいさは測った値の添え書きなので、地名より少し控えめな輪と川の色の文字にする */
 .timeline__item--water::before {
   border-color: var(--color-water);
