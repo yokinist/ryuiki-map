@@ -427,11 +427,15 @@ function goTo({ label, p, aza }: SearchHit) {
     padding: paddingAround(map, $("panel")),
     maxZoom: zoom,
   });
+  const center = maplibregl.LngLat.convert(to?.center ?? p);
   // 動きを減らす設定（duration: 0）では flyTo の中で moveend が出るので、先に待ち受ける。
   // 前の移動が続いていると止めたときの moveend を拾ってしまうので、先に止めておく
   map.stop();
   map.once("moveend", () => {
-    if (id !== going) return;
+    // 途中でドラッグ・ピンチされて止まったときは、着いていないので出さない
+    const off = map.project(map.getCenter()).dist(map.project(center));
+    if (id !== going || Math.abs(map.getZoom() - zoom) > 0.01 || off > 2)
+      return;
     searched = new maplibregl.Popup({
       closeButton: false,
       className: "hint hint--place",
@@ -451,7 +455,7 @@ function goTo({ label, p, aza }: SearchHit) {
   });
   // 遠くへ移ることが多いので、一度引いてから寄る flyTo にする。MapLibre の既定の easing は動き出しの速さが0でないので、0から上げ下げするものに替える
   map.flyTo({
-    center: to?.center ?? p,
+    center,
     zoom,
     easing: easeInOut,
     ...(reducedMotion() ? { duration: 0 } : {}),

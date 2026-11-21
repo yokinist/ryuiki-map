@@ -101,3 +101,20 @@ test("検索のあと地図をクリックすると、案内が消えて雨の�
   await expect(page.locator(".hint--place")).toHaveCount(0);
   await expect(page.locator("#panel")).toHaveAttribute("data-state", "result");
 });
+
+test("移る途中で地図をドラッグしたら、着いていないので案内を出さない", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const input = page.getByRole("combobox", { name: "地名で探す" });
+  await input.fill("札幌");
+  await expect(page.getByRole("option").first()).toBeVisible();
+  await input.press("Enter");
+  await page.waitForTimeout(300);
+  await page.mouse.move(800, 500);
+  await page.mouse.down();
+  await page.mouse.move(700, 450, { steps: 5 });
+  await page.mouse.up();
+  await page.waitForTimeout(4000);
+  await expect(page.locator(".hint--place")).toHaveCount(0);
+});
