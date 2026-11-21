@@ -48,7 +48,8 @@ function entries(rows: SearchRow[], cities: PlaceIndex["cities"]) {
 /**
  * 空白で区切った最後の語を名前に含むものを、市区町村（名前が同じ → 名前で始まる）→ 町丁・字等（同じ → 始まる）→
  * 名前に含む市区町村 → 町丁・字等 の順に、その中では短い名前から limit 件まで（「千葉」なら島田市 千葉より千葉市）。
- * ほかの語は都道府県名・市区町村名に含むものに絞る
+ * ほかの語は都道府県名・市区町村名に含むものに絞る。最後の語が都道府県名（町丁・字等なら続く市区町村名も）から
+ * 始まるときは、それを外して比べる（「東京都狛江」「千葉県銚子市本町」。外すと何も残らないときは外さない）
  */
 export function searchPlaces(
   rows: SearchRow[],
@@ -61,11 +62,12 @@ export function searchPlaces(
   if (!last) return [];
   const hits: { rank: number; e: Entry }[] = [];
   for (const e of entries(rows, cities)) {
-    const at = e.name.indexOf(last);
+    const q = strip(strip(last, e.pref), e.aza ? e.muni : "");
+    const at = e.name.indexOf(q);
     if (at < 0) continue;
     if (!words.every((w) => (e.pref + e.muni).includes(w))) continue;
     const rank =
-      at > 0 ? (e.aza ? 5 : 4) : (e.aza ? 2 : 0) + (e.name === last ? 0 : 1);
+      at > 0 ? (e.aza ? 5 : 4) : (e.aza ? 2 : 0) + (e.name === q ? 0 : 1);
     hits.push({ rank, e });
   }
   return hits
@@ -81,3 +83,9 @@ export function searchPlaces(
       aza: e.aza,
     }));
 }
+
+/** 頭の head を外す。合わないときと、外すと何も残らないときはそのまま */
+const strip = (s: string, head: string) =>
+  head && s.length > head.length && s.startsWith(head)
+    ? s.slice(head.length)
+    : s;

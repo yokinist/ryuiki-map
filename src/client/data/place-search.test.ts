@@ -52,6 +52,15 @@ describe("searchPlaces", () => {
     expect(labels("銚子　本町")).toEqual(["千葉県銚子市 本町"]);
   });
 
+  it("都道府県名・市区町村名から続けて打っても引ける（候補のラベルを打ち直したときなど）", () => {
+    expect(labels("東京都狛江")).toEqual(["東京都狛江市"]);
+    expect(labels("千葉県銚子市本町")).toEqual(["千葉県銚子市 本町"]);
+  });
+
+  it("都道府県名だけでは、その中の町丁・字を並べない", () => {
+    expect(labels("千葉県")).toEqual([]);
+  });
+
   it("空の検索語では何も出さない", () => {
     expect(labels(" ")).toEqual([]);
   });
