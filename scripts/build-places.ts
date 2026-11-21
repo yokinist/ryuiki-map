@@ -7,6 +7,7 @@
 //    zip は展開せず、unzip コマンドで shp・dbf をメモリに読む（手元のディスクを使わないように）
 // 2. 1次メッシュ（約80km四方）ごとに GRID×GRID のマスに割り、マスの中心が入る町丁・字等を塗って、
 //    public/places/<版>/ に書き出す（形式は src/client/data/places.ts の PlaceIndex・PlaceFile）。public/places/latest.json が今の版を指す
+// 3. 地名の文字検索用に、町丁・字等と市区町村の代表点を search.json に書き出す（形式は src/client/data/place-search.ts の SearchRow）
 import { execFileSync } from "node:child_process";
 import {
   existsSync,
@@ -17,7 +18,8 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
-import { rle } from "../src/client/data/place-grid.ts";
+import { cellOf, rle } from "../src/client/data/place-grid.ts";
+import type { SearchRow } from "../src/client/data/place-search.ts";
 import type { PlaceFile, PlaceIndex } from "../src/client/data/places.ts";
 import { sleep } from "./overpass.ts";
 
@@ -134,6 +136,17 @@ const cities: PlaceIndex["cities"] = {};
 const areas: [number, string][] = [];
 const areaId = new Map<string, number>();
 const polys: Poly[] = [];
+/** 検索用の代表点。町丁・字等は e-Stat の代表点（X_CODE・Y_CODE）で、図形が複数あれば面積が最大のもの。
+ * 市区町村は人口が最多の町丁・字等の代表点（役所の位置は元データにないので、中心街の目安にする） */
+const areaPoint = new Map<number, { x: number; y: number; size: number }>();
+const cityPoint = new Map<string, { x: number; y: number; size: number }>();
+const keepLarger = <K>(
+  m: Map<K, { x: number; y: number; size: number }>,
+  k: K,
+  v: { x: number; y: number; size: number },
+) => {
+  if (!(v.size <= (m.get(k)?.size ?? -1))) m.set(k, v);
+};
 for (const pref of PREFS) {
   const shapes = readShp(readZip(pref, "shp"));
   const rows = readDbf(readZip(pref, "dbf"));
@@ -151,6 +164,10 @@ for (const pref of PREFS) {
       areaId.set(key, area);
     }
     polys.push({ area, ...shapes[i] });
+    if (!name) return;
+    const pt = { x: +r.X_CODE, y: +r.Y_CODE };
+    keepLarger(areaPoint, area, { ...pt, size: +r.AREA });
+    keepLarger(cityPoint, city, { ...pt, size: +r.JINKO });
   });
 }
 console.log(
@@ -235,8 +252,19 @@ const meshes: number[] = [];
 let bytes = 0;
 let gz = 0;
 const sizes: [number, number][] = [];
+// 代表点のマスが、その町丁・字等に塗られているか（境界の近くの点は隣になることがある）。数を見るだけ
+const pointsIn = new Map<number, { a: number; cell: number }[]>();
+for (const [a, p] of areaPoint) {
+  const { m1, i, j } = cellOf(p.x, p.y, GRID);
+  const list = pointsIn.get(m1) ?? [];
+  list.push({ a, cell: j * GRID + i });
+  pointsIn.set(m1, list);
+}
+let outside = 0;
 for (const m1 of [...byMesh.keys()].sort((a, b) => a - b)) {
   const grid = raster(m1, byMesh.get(m1) ?? []);
+  for (const { a, cell } of pointsIn.get(m1) ?? [])
+    if (grid[cell] !== a + 1) outside++;
   // ファイルの中だけで通じる番号（1から）に振り直す。0 はどこにも入らないマス
   const local = new Map<number, number>();
   const file: PlaceFile = { areas: [], rows: [] };
@@ -267,6 +295,19 @@ for (const m1 of [...byMesh.keys()].sort((a, b) => a - b)) {
   sizes.push([m1, z]);
 }
 const index: PlaceIndex = { grid: GRID, meshes, cities };
+// 小数4桁（約10m）。1マス（約50m）より細かければ足りる
+const r4 = (v: number) => Math.round(v * 1e4) / 1e4;
+const search: SearchRow[] = [
+  ...[...cityPoint].map(([c, p]): SearchRow => [+c, "", r4(p.x), r4(p.y)]),
+  ...[...areaPoint].map(
+    ([a, p]): SearchRow => [areas[a][0], areas[a][1], r4(p.x), r4(p.y)],
+  ),
+];
+const searchJson = JSON.stringify(search);
+writeFileSync(join(dir, "search.json"), searchJson);
+console.log(
+  `search.json: ${search.length} 件、gzip ${(gzipSync(searchJson).length / 1024 / 1024).toFixed(1)} MB（代表点のマスが別の区域: ${outside} 件）`,
+);
 writeFileSync(join(dir, "index.json"), JSON.stringify(index));
 writeFileSync(join(out, "latest.json"), JSON.stringify({ version }));
 writeFileSync(
@@ -284,6 +325,8 @@ writeFileSync(
   index.json = { grid: ${GRID}, meshes: [ファイルがある1次メッシュ番号, ...], cities: { 市区町村コード: [都道府県名, 市区町村名] } }
   1次メッシュ番号.json = { areas: [[市区町村コード, 町丁・字等の名前], ...], rows: [行, ...] }
     rows は南の行から順に、西から [areas の番号（1から。0 はどこにも入らない）, 続くマスの数, ...]
+  search.json = [[市区町村コード, 町丁・字等の名前, 経度, 緯度], ...]（地名の文字検索用。名前が空の行は市区町村そのもの）
+    町丁・字等の位置は元データの代表点（図形が複数あれば面積が最大のもの）、市区町村の位置は人口が最多の町丁・字等の代表点です。
 `,
 );
 sizes.sort((a, b) => b[1] - a[1]);
