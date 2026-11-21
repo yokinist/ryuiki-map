@@ -31,3 +31,73 @@ test("合う地名がなければそう伝える", async ({ page }) => {
   await page.getByRole("combobox", { name: "地名で探す" }).fill("ああああ");
   await expect(page.getByText("見つかりませんでした")).toBeVisible();
 });
+
+test("動きを減らす設定でも、着いたら案内が出る", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  const input = page.getByRole("combobox", { name: "地名で探す" });
+  await input.fill("狛江");
+  await expect(
+    page.getByRole("option", { name: "東京都狛江市" }),
+  ).toBeVisible();
+  await input.press("Enter");
+  await expect(page.locator(".hint")).toContainText("東京都狛江市");
+});
+
+test("続けて選ぶと、案内は最後に選んだ所の1つだけ出る", async ({ page }) => {
+  await page.goto("/");
+  const input = page.getByRole("combobox", { name: "地名で探す" });
+  await input.fill("狛江");
+  await expect(
+    page.getByRole("option", { name: "東京都狛江市" }),
+  ).toBeVisible();
+  await input.press("Enter");
+  // 1つ目の移動の途中で次を選ぶ
+  await input.fill("軽井沢");
+  await page
+    .getByRole("option", { name: "長野県軽井沢町", exact: true })
+    .click();
+  await expect(page.locator(".hint")).toContainText("長野県軽井沢町");
+  await page.waitForTimeout(1000);
+  await expect(page.locator(".hint")).toHaveCount(1);
+});
+
+test("地形を読み込んでいる途中で検索すると、そのクリックは取り消し、検索した所に留まる", async ({
+  page,
+}) => {
+  await page.goto("/?p=135.5144,34.7237");
+  // 共有された地点（淀川）の地形を読み込み始めた
+  await expect(page.locator("#panel")).toHaveAttribute("data-state", "result");
+  const input = page.getByRole("combobox", { name: "地名で探す" });
+  await input.fill("狛江");
+  await expect(
+    page.getByRole("option", { name: "東京都狛江市" }),
+  ).toBeVisible();
+  await input.press("Enter");
+  await expect(page.locator(".hint")).toContainText("東京都狛江市");
+  expect(new URL(page.url()).searchParams.get("p")).toBeNull();
+  // 読み込みが終わっても、淀川の雨は流さず、地図も引き戻さない
+  await page.waitForTimeout(20_000);
+  await expect(page.locator("#panel")).not.toHaveAttribute(
+    "data-state",
+    "result",
+  );
+  const c = center(page.url());
+  expect(Math.abs(c.lng - 139.5786)).toBeLessThan(0.05);
+});
+
+test("検索のあと地図をクリックすると、案内が消えて雨の流れをたどり始める", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const input = page.getByRole("combobox", { name: "地名で探す" });
+  await input.fill("狛江");
+  await expect(
+    page.getByRole("option", { name: "東京都狛江市" }),
+  ).toBeVisible();
+  await input.press("Enter");
+  await expect(page.locator(".hint")).toContainText("東京都狛江市");
+  await page.locator("#map canvas").click({ position: { x: 900, y: 600 } });
+  await expect(page.locator(".hint--place")).toHaveCount(0);
+  await expect(page.locator("#panel")).toHaveAttribute("data-state", "result");
+});

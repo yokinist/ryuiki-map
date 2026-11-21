@@ -358,6 +358,8 @@ async function onClick(p: LngLat, up = false) {
   }
   const id = ++clicks;
   clicking = true;
+  going++; // 検索で動かしている途中なら、着いたあとの案内を出さない
+  searched?.remove();
   try {
     rain.prepare(p); // すぐに雨粒を置き、パネルに「調べています」を出す
     // 大きく引いた状態のまま追いかけカメラが動き出すと、パンとズームが追いつかず
@@ -403,26 +405,33 @@ async function onClick(p: LngLat, up = false) {
 
 /** 地名の検索で選んだ所に出す印。雨は自動では降らせないので、クリックすればたどれることを添え、次に地図をクリックするまで出しておく */
 let searched: maplibregl.Popup | undefined;
+/** 最後に始めた検索の移動。途中で別の候補を選んだ・地図をクリックしたら、古い移動の案内は出さない */
+let going = 0;
 const SEARCHED_NOTE = "地図をクリックすると、そこに降った雨の流れをたどります";
 
 /** 地名の検索で選んだ所へ地図を動かす。着いたら地名を出し、そこからは地図をクリックして雨を降らせる */
 function goTo({ label, p, aza }: SearchHit) {
+  // 地形を読み込み中のクリックは取り消す（読み終えてから雨を流し、追いかけカメラが地図を引き戻さないように）。
+  // onClick は最新のときだけ clicking を戻すので、ここで戻して後回しの計算も動かす
+  clicks++;
+  clicking = false;
   rain.clear(); // 前の道のりを追いかけるカメラを止め、新しい場所で始められるようにする
   searched?.remove();
+  // 前の道のりの共有 URL を残さない（再読み込み・共有で前の道のりが再生されないように）
+  setParam("p", null);
+  setParam("dir", null);
+  const id = ++going;
   const zoom = aza ? 14 : 12;
   // パネルを避けた中心はここで計算して渡す（padding を flyTo に渡すと地図に残り、以後の動きで二重に効く）
   const to = map.cameraForBounds([p, p], {
     padding: paddingAround(map, $("panel")),
     maxZoom: zoom,
   });
-  // 遠くへ移ることが多いので、一度引いてから寄る flyTo にする。MapLibre の既定の easing は動き出しの速さが0でないので、0から上げ下げするものに替える
-  map.flyTo({
-    center: to?.center ?? p,
-    zoom,
-    easing: easeInOut,
-    ...(reducedMotion() ? { duration: 0 } : {}),
-  });
+  // 動きを減らす設定（duration: 0）では flyTo の中で moveend が出るので、先に待ち受ける。
+  // 前の移動が続いていると止めたときの moveend を拾ってしまうので、先に止めておく
+  map.stop();
   map.once("moveend", () => {
+    if (id !== going) return;
     searched = new maplibregl.Popup({
       closeButton: false,
       className: "hint hint--place",
@@ -439,6 +448,13 @@ function goTo({ label, p, aza }: SearchHit) {
       )
       .addTo(map);
     $("announce").textContent = `${label}に移りました。${SEARCHED_NOTE}。`;
+  });
+  // 遠くへ移ることが多いので、一度引いてから寄る flyTo にする。MapLibre の既定の easing は動き出しの速さが0でないので、0から上げ下げするものに替える
+  map.flyTo({
+    center: to?.center ?? p,
+    zoom,
+    easing: easeInOut,
+    ...(reducedMotion() ? { duration: 0 } : {}),
   });
 }
 
@@ -602,7 +618,9 @@ async function main() {
   setupAbout();
 
   refreshIdleStatus();
-  if (shared) onClick(shared, sharedUp);
+  // 地図を読み込む間に地名の検索で別の所へ移っていたら（goTo が ?p= を消す）、共有された地点は再生しない
+  if (shared && new URLSearchParams(location.search).has("p"))
+    onClick(shared, sharedUp);
   showViewRivers();
   computeWhenIdle();
 }
