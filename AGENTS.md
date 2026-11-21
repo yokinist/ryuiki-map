@@ -4,7 +4,7 @@
 
 ## 仕上げ
 
-変更を終えたら `pnpm typecheck && pnpm check && pnpm test` を通す。`index.html`・`vite.config.ts`・`site.*.ts`・`wrangler.jsonc` を触ったら `pnpm build` も（CI は4つとも走らせる）。計算（`terrain/`・`data/`）・データ（`public/rivers/`・`public/karte/`・`public/places/`・`public/water/`）・画面の流れを触ったら `pnpm test:e2e`（ブラウザで代表地点の結果を確かめる。数分かかる。CI ではそれらが変わった PR でだけ、PR のプレビュー URL に対して走る）。
+変更を終えたら `pnpm typecheck && pnpm check && pnpm test` を通す。`index.html`・`vite.config.ts`・`site.*.ts`・`wrangler.jsonc` を触ったら `pnpm build` も（CI は4つとも走らせる）。計算（`terrain/`・`data/`）・データ（`public/rivers/`・`public/karte/`・`public/places/`・`public/water/`・`public/suisei/`・`public/mizumap/`）・画面の流れを触ったら `pnpm test:e2e`（ブラウザで代表地点の結果を確かめる。数分かかる。CI ではそれらが変わった PR でだけ、PR のプレビュー URL に対して走る）。
 
 ## 公開
 
@@ -42,8 +42,10 @@
 - `public/rivers/` は `pnpm build:rivers` の生成物だが git で管理する（作り直したらコミットする。古い版のフォルダはスクリプトが消す）。変換のやり直しは `pnpm build:rivers --pack`。引数なしの全国取得は Overpass API に40〜60分問い合わせ続けるので、頼まれたときだけ走らせる。頼まれても、本当に取り直す必要があるか（`--pack` での変換のやり直しで足りないか）を先に確かめる
 - `public/places/` は `pnpm build:places` の生成物だが git で管理する（`public/karte/` と同じ）。取得は e-Stat の町丁・字等別境界データ 47本（約320MB・1分強。`.cache/places/` に置き、取得済みの分は再利用する）で、作り直しは `pnpm build:places --pack`。zip は展開せずに `unzip` コマンドで読む
 - `public/water/` は `pnpm build:water` の生成物だが git で管理する（`public/places/` と同じ）。取得は環境省の水環境総合情報サイトへ、最新の年度で47回（10〜20分）、推移を見る過去3年度で141回（40分ほど）問い合わせる（取得済みの分は `.cache/water/` から再利用する）ので、頼まれたときだけ走らせる。頼まれても、`--pack` でのまとめ直しで足りないかを先に確かめる。測定点の川の名前はその時点の `public/rivers/` の河川線から取るので、河川データを作り直したら `pnpm build:water --pack` もやり直す
+- `public/suisei/` は `pnpm build:suisei` の生成物だが git で管理する（`public/water/` と同じ）。取得は環境省の水環境総合情報サイトの地図サーバーへ年度ごとに1回で、すぐ終わる。調査地点の川の名前も `public/rivers/` の河川線から取るので、河川データを作り直したら `pnpm build:suisei --pack` もやり直す
+- `public/mizumap/` は `pnpm build:mizumap` の生成物だが git で管理する（`public/suisei/` と同じ）。取得は全国水環境マップ実行委員会のサイトから年ごとの Excel を1本ずつで、すぐ終わる。xlsx は展開せずに `unzip -p` で読む。年を足すときは、その年の結果ページからリンクされた Excel のファイル名を `scripts/build-mizumap.ts` の `FILES` に足す（年によって名前が違う）。河川データを作り直したら `pnpm build:mizumap --pack` もやり直す
 - `public/karte/` は `pnpm build:karte` の生成物だが git で管理する（`public/rivers/` と同じ）。まとめ直しは `pnpm build:karte --pack`。全国の取得は e-Stat・WorldCover・Overpass に約1時間問い合わせる（取得済みの分は `.cache/` から再利用する）ので、頼まれたときだけ走らせる。頼まれても、本当に取り直す必要があるか（`--pack` でのまとめ直しで足りないか）を先に確かめる
-- どれも、作り直しは `.cache/`（git 管理外）にある取得済みの分だけで全体を書き出す。キャッシュが一部しかない状態で走らせると他の地域が消えるので、コミット前に `git status` でファイルが大量に消えていないか確かめる（戻すときは `git restore public/rivers public/karte public/places public/water`）
+- どれも、作り直しは `.cache/`（git 管理外）にある取得済みの分だけで全体を書き出す。キャッシュが一部しかない状態で走らせると他の地域が消えるので、コミット前に `git status` でファイルが大量に消えていないか確かめる（戻すときは `git restore public/rivers public/karte public/places public/water public/suisei public/mizumap`）
 - 流域サマリの降水量（Open-Meteo）は、サマリを開いたときだけ1回問い合わせる。地図を動かすたびに問い合わせるような使い方はしない（無料枠は非商用・1日1万回）
 - OSM 由来の河川データは ODbL。地図の出典表示（`config.ts` の `ATTRIBUTION`）と、河川タイルに添える `README.txt` を保つ
 

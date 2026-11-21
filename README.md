@@ -4,7 +4,7 @@
 
 [![流域探索マップ — ここに降った雨は、どこの海へ？](public/og.png)](https://ryuiki-map.ykns.workers.dev/)
 
-ある地点に降った雨が、どの川と市区町村を通って海へ向かうかをたどれる探索マップ。日本全国に対応。地点をクリックすると雨粒が川を下り、合流する川・通過するダムと堰・通過する市区町村・近くの水質測定点にもとづく水のきれいさが時系列に並ぶ。`?p=経度,緯度` 付きの URL を開くと、その地点の水の流れを再生する（`&dir=up` も付いていれば、下る動きは見せずに水源へさかのぼる）。
+ある地点に降った雨が、どの川と市区町村を通って海へ向かうかをたどれる探索マップ。日本全国に対応。地点をクリックすると雨粒が川を下り、合流する川・通過するダムと堰・通過する市区町村・近くの水質測定点にもとづく水のきれいさ・市民の調査（全国水生生物調査・身近な水環境の全国一斉調査）の結果が時系列に並ぶ。水質の測定点と市民の調査地点は、地図にも色の点で置く。`?p=経度,緯度` 付きの URL を開くと、その地点の水の流れを再生する（`&dir=up` も付いていれば、下る動きは見せずに水源へさかのぼる）。
 
 雨が着いたら「上流へさかのぼる」で、その地点の水がどこから来たか（通る川・流れ込む主な支流・市区町村・水源）をたどれる。「流域サマリを見る」で、海までの距離と通り道の土地の使われ方、およびその地点より上流（集水域）の面積・標高・人口の推移・年間降水量・ダムと堰・川を1枚にまとめて出す。
 
@@ -41,6 +41,8 @@ pnpm build:places       # 地名の格子を e-Stat の町丁・字等別境界�
 | `pnpm build:karte [1次メッシュ…\|--pack]` | 流域サマリ用のデータ。e-Stat の国勢調査1kmメッシュ（2010・2015・2020年の人口）、ESA WorldCover（土地の使われ方）、OSM のダム・堰を取得し、1次メッシュ（約80km四方）ごとのファイルにまとめる。途中から再開できる。`5339` のように指定するとそれだけ取る。どちらもまとめは取得済みの全メッシュで行う。`--pack` は取得せずまとめ直す |
 | `pnpm build:places [--pack]` | 地名の格子。e-Stat の「令和2年国勢調査 町丁・字等別境界データ」（都道府県ごとの Shapefile の zip、約320MB）を取得し、1次メッシュごとに約56m×46m のマスへ塗ったファイル（`public/places/`、JSON 約47MB・gzip 約12MB）にする。取得済みの県は `.cache/places/` から再利用する（zip は展開せず `unzip` コマンドで読む）。`--pack` は取得せず作り直す |
 | `pnpm build:water [--pack]` | 水のきれいさの表。環境省「水環境総合情報サイト」の公共用水域水質測定結果（年間値・生活環境項目）を都道府県ごとに取得し（47回の問い合わせで10〜20分）、河川の測定点のうち BOD 年平均があるものを、都道府県ごとの最新年度（2024・2023年度のうち新しいもの）で `public/water/` にまとめる。推移を見るため、同じ測定点の1994・2004・2014年度の値も取って添える（さらに141回、40分ほど）。取得済みの分は `.cache/water/` から再利用する。`--pack` は取得せずまとめ直す |
+| `pnpm build:suisei [--pack]` | 川の生きもの調べの表。環境省「水環境総合情報サイト」の全国水生生物調査結果を、閲覧ページの地図が読む地図サーバーに年度ごとに問い合わせ（2023〜2025年度の3回、数秒）、水質階級の判定がある調査地点を `public/suisei/` にまとめる。同じ地点は新しい年度だけ残す。取得済みの分は `.cache/suisei/` から再利用する。`--pack` は取得せずまとめ直す |
+| `pnpm build:mizumap [--pack]` | 市民の水質調べの表。全国水環境マップ実行委員会が年ごとに公開している「身近な水環境の全国一斉調査」の全国データ（Excel）を2023〜2025年の3本取得し、COD と位置がある調査地点を `public/mizumap/` にまとめる。同じ地点は新しい年だけ残す。取得済みの分は `.cache/mizumap/` から再利用する。`--pack` は取得せずまとめ直す |
 | `pnpm build:seas` | 河口がどの海かを判定する海域データ（`public/seas.json`、約140KB）を作る。1回きりでよい |
 | `pnpm build:og` | 共有時の画像 `public/og.png` を `site.config.ts` の `name`・`stage`・`ogTagline` で描き直す（右の地図は `assets/og-map.png`）。文字は macOS のヒラギノで描く |
 | `pnpm build:hill` | 陰影起伏図で海だけのタイル（404 になる）の一覧（`src/client/map/hill-missing.json`）を作る。問い合わせずに済ませてコンソールのエラーを減らす。1回きりでよい |
@@ -223,9 +225,9 @@ src/client/              ページ（ブラウザ側）
     dom.ts               DOM ヘルパー
     format.ts            距離・時間・面積の表示形式
   styles/                tokens.css（デザイントークン）と app.css
-scripts/                 データの作成（河川: build-rivers.ts、流域サマリ: build-karte.ts、地名の格子: build-places.ts、水質: build-water.ts、海域: build-seas.ts、陰影の欠けタイル: build-hill-index.ts、共有時の画像: build-og.ts、Overpass API の問い合わせ: overpass.ts）
+scripts/                 データの作成（河川: build-rivers.ts、流域サマリ: build-karte.ts、地名の格子: build-places.ts、水質: build-water.ts、川の生きもの調べ: build-suisei.ts、市民の水質調べ: build-mizumap.ts、測定点のそばの川の名前: river-names.ts、海域: build-seas.ts、陰影の欠けタイル: build-hill-index.ts、共有時の画像: build-og.ts、Overpass API の問い合わせ: overpass.ts）
 assets/                  配信しない素材（共有時の画像の右側の地図 og-map.png）
-public/                  静的ファイル（seas.json、_headers、地図の欧文フォント fonts/、アイコン・OGP 画像。河川タイル rivers/・流域サマリ karte/・地名の格子 places/・水質 water/ は生成物だが git で管理する）
+public/                  静的ファイル（seas.json、_headers、地図の欧文フォント fonts/、アイコン・OGP 画像。河川タイル rivers/・流域サマリ karte/・地名の格子 places/・水質 water/・川の生きもの調べ suisei/・市民の水質調べ mizumap/ は生成物だが git で管理する）
 site.config.ts           サイト名・説明・URL・構造化データ。index.html の {{キー}} に差し込む
 site.files.ts            robots.txt・sitemap.xml・llms.txt（AI 向けのサイト説明）。ビルド時に書き出す
 wrangler.jsonc           Cloudflare Workers の設定。静的アセットを配るだけで Worker のコードは持たない
@@ -238,13 +240,15 @@ wrangler.jsonc           Cloudflare Workers の設定。静的アセットを配
 
 ## 出典・ライセンス
 
-ソースコードは [MIT License](LICENSE)。地図データは以下のとおりそれぞれ別のライセンスで、MIT は適用されない（リポジトリに入っている `public/rivers/`・`public/karte/`・`public/places/`・`public/water/` も、各フォルダの `README.txt` のライセンスに従う。詳しくは [NOTICE.md](NOTICE.md)）。
+ソースコードは [MIT License](LICENSE)。地図データは以下のとおりそれぞれ別のライセンスで、MIT は適用されない（リポジトリに入っている `public/rivers/`・`public/karte/`・`public/places/`・`public/water/`・`public/suisei/`・`public/mizumap/` も、各フォルダの `README.txt` のライセンスに従う。詳しくは [NOTICE.md](NOTICE.md)）。
 
 - [地理院タイル](https://maps.gsi.go.jp/development/ichiran.html)（白地図・淡色地図・陰影起伏図・標高タイル）（国土地理院）
 - 河川線と名前: [© OpenStreetMap contributors](https://www.openstreetmap.org/copyright)（[ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/)）
 - 海域: Flanders Marine Institute (2018). IHO Sea Areas, version 3（[Marine Regions](https://www.marineregions.org/)、CC BY 4.0）。日本周辺で切り抜き・簡略化して `public/seas.json` にしている（`pnpm build:seas`）
 - 地名（市区町村・町丁・字）: 「令和2年国勢調査 町丁・字等別境界データ」（総務省統計局、[e-Stat](https://www.e-stat.go.jp/gis)）。令和2年10月1日現在の区域・名前。[政府標準利用規約（第2.0版）](https://www.e-stat.go.jp/terms-of-use)に基づき、1次メッシュごとに約56m×46m のマスへ塗って `public/places/` にしている（`pnpm build:places`）
 - 水のきれいさ: 「公共用水域水質測定結果」（環境省、[水環境総合情報サイト](https://water-pub.env.go.jp/water-pub/mizu-site/)）の年間値（生活環境項目）。[公共データ利用規約（第1.0版）](https://www.env.go.jp/mail.html)に基づき加工して利用。河川の測定点のうち BOD 年平均があるものを、都道府県ごとに公表されている最新の年度で `public/water/` にしている。同じ測定点の1994・2004・2014年度の値も添える（`pnpm build:water`。定量下限未満は下限値に置き換える）
+- 川の生きもの調べ: 「全国水生生物調査結果」（環境省、[水環境総合情報サイト](https://water-pub.env.go.jp/water-pub/mizu-site/suisei/pub/eturan/select.html)）。[公共データ利用規約（第1.0版）](https://www.env.go.jp/mail.html)に基づき加工して利用。2023〜2025年度の調査地点のうち水質階級の判定があるものを `public/suisei/` にしている（`pnpm build:suisei`。同じ地点は新しい年度だけ残す）
+- 市民の水質調べ: 「身近な水環境の全国一斉調査」全国公開データ（[全国水環境マップ実行委員会](https://japan-mizumap.org/) 作成）。2023〜2025年の調査地点のうち COD と位置があるものを `public/mizumap/` にしている（`pnpm build:mizumap`。同じ地点は新しい年だけ残す）。実行委員会は、使うときに「全国水環境マップ実行委員会 作成」と書くことを求めている
 - 流域サマリの人口: 「国勢調査」2010・2015・2020年 3次メッシュ（1kmメッシュ）人口総数（総務省統計局、[e-Stat](https://www.e-stat.go.jp/gis)）。[政府標準利用規約（第2.0版）](https://www.e-stat.go.jp/terms-of-use)に基づき加工して利用（秘匿値は0として集計）
 - 流域サマリの土地の使われ方: © ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium（[ESA WorldCover](https://esa-worldcover.org/)、CC BY 4.0）。約70mに縮小した版から1kmメッシュごとの分類の割合にしている
 - 流域サマリの年間降水量: [Weather data by Open-Meteo.com](https://open-meteo.com/)（CC BY 4.0。Copernicus Climate Change Service の ERA5 を含む）。表示のたびにブラウザから問い合わせる
@@ -260,6 +264,8 @@ wrangler.jsonc           Cloudflare Workers の設定。静的アセットを配
 | 国勢調査 1kmメッシュ人口（e-Stat） | [政府標準利用規約（第2.0版）](https://www.e-stat.go.jp/terms-of-use)（CC BY 4.0 互換） | 出典の記載と、加工した旨の明示 | アプリ内と `/karte/<版>/meshes/README.txt` に「出典：政府統計の総合窓口(e-Stat)」「〜を加工して作成」と記載 |
 | 町丁・字等別境界データ（e-Stat） | [政府標準利用規約（第2.0版）](https://www.e-stat.go.jp/terms-of-use)（CC BY 4.0 互換） | 出典の記載と、加工した旨の明示 | アプリ内と `/places/README.txt` に「出典：政府統計の総合窓口(e-Stat)」「「令和2年国勢調査 町丁・字等別境界データ」（総務省統計局）を加工して作成」と記載 |
 | 公共用水域水質測定結果（環境省） | [公共データ利用規約（第1.0版）](https://www.env.go.jp/mail.html)（CC BY 4.0 互換） | 出典の記載と、加工した旨の明示 | アプリ内と `/water/README.txt` に「「公共用水域水質測定結果」（環境省 水環境総合情報サイト）…を加工して作成」と記載 |
+| 全国水生生物調査結果（環境省） | [公共データ利用規約（第1.0版）](https://www.env.go.jp/mail.html)（CC BY 4.0 互換） | 出典の記載と、加工した旨の明示 | アプリ内と `/suisei/README.txt` に「「全国水生生物調査結果」（環境省 水環境総合情報サイト）…を加工して作成」と記載 |
+| 身近な水環境の全国一斉調査 全国公開データ（全国水環境マップ実行委員会） | 明記なし（公開データ。使うときは作成者の記載を求めている） | 「全国水環境マップ実行委員会 作成」の記載 | アプリ内と `/mizumap/README.txt` に「全国水環境マップ実行委員会 作成」と記載 |
 | ESA WorldCover | CC BY 4.0 | 所定の出典文言と、改変した旨 | 所定の文言（© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data…）をアプリ内と `meshes/README.txt` に記載し、1kmメッシュに集計した旨も書いている |
 | IHO Sea Areas（Marine Regions） | CC BY 4.0 | 出典表示と、改変した旨 | アプリ内に出典と「日本周辺で切り抜き・簡略化して使用」を記載（`/seas.json`） |
 | Open-Meteo の降水量 | CC BY 4.0。無料 API は非商用のみ | 出典表示。商用なら有料プラン | アプリ内に「Weather data by Open-Meteo.com」をリンク付きで記載。広告・課金のない非商用のアプリ |

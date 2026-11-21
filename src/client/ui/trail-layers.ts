@@ -6,7 +6,7 @@ import { pixel } from "../map/theme";
 import type { Grid } from "../terrain/grid";
 import { upstream } from "../terrain/hydro";
 import { el } from "./dom";
-import type { TimelineEvent } from "./timeline";
+import type { SurveyDot, TimelineEvent } from "./timeline";
 
 type Line = "downstream" | "upstream";
 
@@ -15,7 +15,39 @@ export class TrailLayers {
     element: el("div", { className: "drop", ariaHidden: "true" }), // 地図上の飾り。内容はパネルが伝える
   });
 
-  constructor(private readonly map: MlMap) {}
+  private readonly popup = new maplibregl.Popup({
+    closeButton: false,
+    maxWidth: "240px",
+  });
+
+  constructor(private readonly map: MlMap) {
+    // 地図の調査地点を押すと、場所と結果を出す
+    map.on("click", "survey", (e) => {
+      const f = e.features?.[0];
+      if (f?.geometry.type !== "Point") return;
+      this.popup
+        .setLngLat(f.geometry.coordinates as LngLat)
+        .setText(String(f.properties.text))
+        .addTo(map);
+    });
+  }
+
+  /** 環境省の測定点・市民の調査地点を地図に点で置く。時系列の帯で押した点（on）だけ目立たせる */
+  showSurvey(dots: SurveyDot[], pts: LngLat[], on?: SurveyDot) {
+    setData(this.map, "survey", {
+      type: "FeatureCollection",
+      features: dots.map((d) => ({
+        type: "Feature",
+        properties: {
+          kind: d.kind,
+          tone: d.tone,
+          text: d.text,
+          on: d === on,
+        },
+        geometry: { type: "Point", coordinates: pts[d.step] },
+      })),
+    });
+  }
 
   /** 雨粒の印を p に置く */
   placeDrop(p: LngLat) {
@@ -32,6 +64,8 @@ export class TrailLayers {
     setData(this.map, "downstream");
     setData(this.map, "upstream");
     setData(this.map, "confluences");
+    setData(this.map, "survey");
+    this.popup.remove();
   }
 
   /** 流れの先読み（カーソルの下の流れ）を消す */

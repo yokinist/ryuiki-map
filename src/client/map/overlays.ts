@@ -18,6 +18,7 @@ const DATA_LAYERS = [
   "hover",
   "upstream",
   "downstream",
+  "survey",
   "confluences",
 ] as const;
 type ImageLayer = (typeof IMAGE_LAYERS)[number];
@@ -166,6 +167,36 @@ export function addOverlays(map: MlMap) {
   });
   // 合流点・支流の合流・ダムを種類ごとに見分けられるようにする。
   // 支流は本筋ほど目立たせない輪、ダムは小さく濃い色。雨の通り道・水の来た道のどちらでも同じ印を使う
+  // 通り道のそばの調査地点。段階の色の点で、環境省の測定点（water）は大きく川の濃い色で縁取り、
+  // 市民の調査地点は小さくする。時系列の帯で押した市民の点（on）だけ大きく縁取る
+  const on: ExpressionSpecification = ["==", ["get", "on"], true];
+  const isWater: ExpressionSpecification = ["==", ["get", "kind"], "water"];
+  map.addLayer({
+    id: "survey",
+    type: "circle",
+    source: "survey",
+    paint: {
+      "circle-radius": ["case", on, 8, isWater, 6.5, 4.5],
+      "circle-color": [
+        "match",
+        ["get", "tone"],
+        0,
+        token("--color-survey-0"),
+        1,
+        token("--color-survey-1"),
+        token("--color-survey-2"),
+      ],
+      "circle-stroke-color": [
+        "case",
+        on,
+        waterStrong,
+        isWater,
+        waterStrong,
+        halo,
+      ],
+      "circle-stroke-width": ["case", on, 3, isWater, 2.5, 1.5],
+    },
+  });
   const kind: ExpressionSpecification = ["get", "kind"];
   const isBranch: ExpressionSpecification = ["==", kind, "branch"];
   map.addLayer({

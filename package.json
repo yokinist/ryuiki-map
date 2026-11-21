@@ -24,6 +24,8 @@
     "build:karte": "node scripts/build-karte.ts",
     "build:places": "node scripts/build-places.ts",
     "build:water": "node scripts/build-water.ts",
+    "build:suisei": "node scripts/build-suisei.ts",
+    "build:mizumap": "node scripts/build-mizumap.ts",
     "build:seas": "node scripts/build-seas.ts",
     "build:hill": "node scripts/build-hill-index.ts",
     "build:og": "node scripts/build-og.ts"
