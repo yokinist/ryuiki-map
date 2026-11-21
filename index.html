@@ -47,6 +47,8 @@
           <h2 class="journey__headline" id="headline">ここに降った雨は…</h2>
           <div class="journey__meter" aria-hidden="true"><div class="journey__bar" id="bar"></div></div>
           <p class="journey__progress" id="progress" aria-live="off"></p>
+          <!-- 共有は結論のすぐ下に置く。共有ボタンから共有すると、SNS などのプレビューに結果が出る（アドレスバーからのコピーでは出ない） -->
+          <button type="button" class="button button--share" id="share" hidden><svg class="button__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 8l5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="share-label">この結果を共有する</span></button>
         </div>
         <!-- スマホでは到着後にたたみ、地図（到着点）を見せる -->
         <details class="route" id="route" name="trail" open>
@@ -61,7 +63,6 @@
           <div class="source-note" id="source-note"></div>
         </details>
         <div class="summary" id="summary" hidden></div>
-        <button type="button" class="button button--link" id="share" hidden>この結果を共有する</button>
       </section>
       <!-- アプリについて・出典とライセンスは別々のトグルにし、name で束ねて同時に1つまでしか開かないようにする -->
       <details class="about" id="about" name="info">
