@@ -617,6 +617,14 @@ async function main() {
     setData(map, "hover");
   });
   share.onclick = onShare;
+  // 検索欄はパネルの先頭にあり、結果を読むうちに隠れるので、先頭まで戻してから入力を待つ
+  $("again").onclick = () => {
+    $("panel").scrollTo({
+      top: 0,
+      behavior: reducedMotion() ? "auto" : "smooth",
+    });
+    $("search-input").focus({ preventScroll: true });
+  };
   setupKeyboard();
   setupKarte();
   setupAbout();

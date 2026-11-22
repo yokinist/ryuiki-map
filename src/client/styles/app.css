@@ -564,6 +564,24 @@ button.survey-dot {
   border-top: 1px solid var(--color-border);
   animation: settle var(--duration-slow) var(--ease-out);
 }
+/* 結果の下に添える「ほかの場所を探す」「はじめの画面に戻る」。ボタンより控えめな文字のリンクにする */
+.again {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-1) var(--space-4);
+  margin-top: var(--space-3);
+  font-size: var(--font-size-sm);
+}
+.again__link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-water-strong);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
 /* 用語の説明を開く「？」。吹き出しにせずパネルの流れの中に行を足すので、画面外にはみ出さない */
 .help {
   flex: none;
