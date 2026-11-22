@@ -568,10 +568,15 @@ button.survey-dot {
 .again {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
+  justify-content: space-between;
   gap: var(--space-1) var(--space-4);
   margin-top: var(--space-3);
   font-size: var(--font-size-sm);
+  animation: settle var(--duration-slow) var(--ease-out);
+}
+/* 流域サマリのボタンと一緒に出す（着くまでは道のりを追うのを邪魔しない） */
+.summary[hidden] + .again {
+  display: none;
 }
 .again__link {
   padding: 0;
