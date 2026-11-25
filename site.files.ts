@@ -67,6 +67,18 @@ Ryuiki Tansaku Map ("ryuiki" means watershed / drainage basin, "tansaku" means e
 - 流域サマリの年間降水量: [Weather data by Open-Meteo.com](https://open-meteo.com/)（CC BY 4.0、ERA5）
 - ダム・堰（流域サマリ・雨の通り道）: © OpenStreetMap contributors（ODbL 1.0）。流域サマリのデータも配信: ${SITE.url}karte/README.txt
 
+## データを使う
+
+アプリが使うデータは配信しているファイルそのものなので、自作のアプリや分析にも使える。出典とライセンスはフォルダごとの README.txt（上の「出典・ライセンス」）に従う。
+
+- \`${SITE.url}<フォルダ>/latest.json\` が今の版（日付のフォルダ名）を指し、ファイルは \`${SITE.url}<フォルダ>/<版>/\` にある。中身の並びは \`${SITE.url}<フォルダ>/README.txt\`
+- rivers: 河川線と名前。0.5°四方のタイル \`<経度×2 の整数>_<緯度×2 の整数>.json\`
+- water・suisei・mizumap: 水質測定点の BOD・全国水生生物調査・全国一斉調査の COD。1次メッシュごとの \`<1次メッシュ番号>.json\`
+- karte: 1kmメッシュの人口と土地の使われ方（\`<版>/meshes/\`）、ダム・堰（\`<版>/dams/\`）。1次メッシュごと
+- places: 町丁・字の格子（1次メッシュごと）と、地名から位置を引く \`search.json\`
+- 1次メッシュ番号は「緯度×1.5 の整数」と「経度−100 の整数」を並べた4桁（例: 経度139.3・緯度35.5 → 5339）
+- ほかのサイトのページからブラウザで直接は読めない（CORS を許していない）。必要な分をダウンロードして、自分のプロジェクトに置いて使う。同じファイルはリポジトリの \`public/\` にもある
+
 ## リンク
 
 - [${SITE.name}${SITE.stage}](${SITE.url}): アプリ本体
