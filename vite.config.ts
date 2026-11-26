@@ -72,7 +72,9 @@ const siteFiles = (): Plugin => ({
   name: "site-files",
   configureServer(server) {
     server.middlewares.use((req, res, next) => {
-      const file = SITE_FILES[req.url?.split("?")[0] ?? ""];
+      const path = req.url?.split("?")[0] ?? "";
+      // /data/ のようなフォルダの URL は、本番と同じく index.html を返す
+      const file = SITE_FILES[path] ?? SITE_FILES[`${path}index.html`];
       if (!file) return next();
       res.setHeader("Content-Type", file[0]);
       res.end(file[1]);

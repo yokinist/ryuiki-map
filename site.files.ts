@@ -1,6 +1,37 @@
 // ビルド時に dist へ書き出す、サイトの URL を含むファイル（開発サーバーでも同じものを返す）。
 // Worker で返すと bot のアクセスが Worker の実行回数（無料枠）を食うので、静的アセットにしている
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { SITE } from "./site.config.ts";
+import {
+  type DataFolder,
+  dataCatalog,
+  dataPageHtml,
+} from "./src/client/data/catalog.ts";
+
+// データの目録。今の版は public/<フォルダ>/latest.json から読むので、データを作り直しても手で直す所はない
+const FOLDERS: DataFolder[] = [
+  "rivers",
+  "karte",
+  "places",
+  "water",
+  "suisei",
+  "mizumap",
+];
+const catalog = dataCatalog(
+  SITE.url,
+  Object.fromEntries(
+    FOLDERS.map((f) => [
+      f,
+      JSON.parse(
+        readFileSync(
+          join(import.meta.dirname, "public", f, "latest.json"),
+          "utf8",
+        ),
+      ).version,
+    ]),
+  ),
+);
 
 const robots = `User-agent: *
 Allow: /
@@ -74,6 +105,8 @@ Ryuiki Tansaku Map ("ryuiki" means watershed / drainage basin, "tansaku" means e
 
 アプリが使うデータは配信しているファイルそのものなので、自作のアプリや分析にも使える。出典とライセンスはフォルダごとの README.txt（上の「出典・ライセンス」）に従う。
 
+- データの一覧（今の版・ファイルの置き場・大きさ・出典・ライセンス）: ${SITE.url}data.json（人が読むページは ${SITE.url}data/）
+
 - \`${SITE.url}<フォルダ>/latest.json\` が今の版（日付のフォルダ名）を指し、ファイルは \`${SITE.url}<フォルダ>/<版>/\` にある。中身の並びは \`${SITE.url}<フォルダ>/README.txt\`
 - rivers: 河川線と名前。0.5°四方のタイル \`<経度×2 の整数>_<緯度×2 の整数>.json\`
 - water・suisei・mizumap: 水質測定点の BOD・全国水生生物調査・全国一斉調査の COD。1次メッシュごとの \`<1次メッシュ番号>.json\`
@@ -100,4 +133,12 @@ export const SITE_FILES: Record<string, [type: string, body: string]> = {
   "/robots.txt": ["text/plain; charset=utf-8", robots],
   "/sitemap.xml": ["application/xml; charset=utf-8", sitemap],
   "/llms.txt": ["text/plain; charset=utf-8", llms],
+  "/data.json": [
+    "application/json; charset=utf-8",
+    `${JSON.stringify(catalog, null, 2)}\n`,
+  ],
+  "/data/index.html": [
+    "text/html; charset=utf-8",
+    dataPageHtml(catalog, `${SITE.name}${SITE.stage}`),
+  ],
 };

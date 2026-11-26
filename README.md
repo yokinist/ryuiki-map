@@ -249,6 +249,8 @@ tsconfig.worker.json     Worker の型チェック（Workers のランタイム�
 
 ソースコードは [MIT License](LICENSE)。地図データは以下のとおりそれぞれ別のライセンスで、MIT は適用されない（リポジトリに入っている `public/rivers/`・`public/karte/`・`public/places/`・`public/water/`・`public/suisei/`・`public/mizumap/` も、各フォルダの `README.txt` のライセンスに従う。詳しくは [NOTICE.md](NOTICE.md)）。
 
+配信しているデータの一覧（今の版・ファイルの置き場・出典・ライセンス）は [`/data/`](https://ryuiki-map.ykns.workers.dev/data/)、機械向けは `/data.json`。どちらもビルド時に `site.files.ts` が `src/client/data/catalog.ts` と各フォルダの `latest.json` から書き出す。
+
 - [地理院タイル](https://maps.gsi.go.jp/development/ichiran.html)（白地図・淡色地図・陰影起伏図・標高タイル）（国土地理院）
 - 河川線と名前: [© OpenStreetMap contributors](https://www.openstreetmap.org/copyright)（[ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/)）
 - 海域: Flanders Marine Institute (2018). IHO Sea Areas, version 3（[Marine Regions](https://www.marineregions.org/)、CC BY 4.0）。日本周辺で切り抜き・簡略化して `public/seas.json` にしている（`pnpm build:seas`）
