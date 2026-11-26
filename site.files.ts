@@ -106,6 +106,7 @@ Ryuiki Tansaku Map ("ryuiki" means watershed / drainage basin, "tansaku" means e
 アプリが使うデータは配信しているファイルそのものなので、自作のアプリや分析にも使える。出典とライセンスはフォルダごとの README.txt（上の「出典・ライセンス」）に従う。
 
 - データの一覧（今の版・ファイルの置き場・大きさ・出典・ライセンス）: ${SITE.url}data.json（人が読むページは ${SITE.url}data/）
+- 出典には、使ったデータの出典の文（data.json の attribution）を書く。決まりではないが「データの入手元：」に続けて data.json の source を添えると、版（日付）まで分かる（例: データの入手元：${catalog.datasets.find((d) => d.id === "water")?.source}）
 
 - \`${SITE.url}<フォルダ>/latest.json\` が今の版（日付のフォルダ名）を指し、ファイルは \`${SITE.url}<フォルダ>/<版>/\` にある。中身の並びは \`${SITE.url}<フォルダ>/README.txt\`
 - rivers: 河川線と名前。0.5°四方のタイル \`<経度×2 の整数>_<緯度×2 の整数>.json\`

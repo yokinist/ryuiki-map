@@ -37,6 +37,15 @@ describe("dataCatalog", () => {
     expect(dams?.license).toContain("ODbL");
   });
 
+  it("入手元の文には、データの名前と版と一覧のページが入る", () => {
+    const water = dataCatalog(URL, VERSIONS).datasets.find(
+      (d) => d.id === "water",
+    );
+    expect(water?.source).toBe(
+      "流域探索マップの配信データ（水のきれいさ 20261119 版）https://example.test/data/",
+    );
+  });
+
   it("どのデータにも、書く出典とライセンスがある", () => {
     for (const d of dataCatalog(URL, VERSIONS).datasets) {
       expect(d.attribution, d.id).not.toBe("");

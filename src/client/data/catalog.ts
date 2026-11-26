@@ -134,6 +134,8 @@ export interface Dataset extends Omit<DatasetSpec, "path"> {
   latest: string;
   readme: string;
   files: string;
+  /** 出典に添える入手元の文（決まりではない）。版が入るので、同じ時点のデータをたどれる */
+  source: string;
 }
 
 export interface DataCatalog {
@@ -165,6 +167,7 @@ export function dataPageHtml(catalog: DataCatalog, siteName: string): string {
 <dt>ファイル</dt><dd><code>${esc(d.files)}</code>（1ファイル最大${esc(d.maxSize)}）</dd>
 <dt>説明</dt><dd><a href="${esc(d.readme)}">README.txt</a> ・ 今の版を指す <a href="${esc(d.latest)}">latest.json</a></dd>
 <dt>出典</dt><dd>${esc(d.attribution)}</dd>
+<dt>入手元</dt><dd>${esc(d.source)}（決まりではないが、添えると同じ時点のデータをたどれる）</dd>
 <dt>ライセンス</dt><dd>${esc(d.license)}</dd>
 <dt>商用</dt><dd>${esc(d.commercial)}</dd>
 </dl>
@@ -212,6 +215,7 @@ export function dataCatalog(
       latest: `${siteUrl}${spec.folder}/latest.json`,
       readme: `${siteUrl}${spec.folder}/README.txt`,
       files: `${siteUrl}${spec.folder}/${version}/${path}`,
+      source: `流域探索マップの配信データ（${spec.name} ${version} 版）${siteUrl}data/`,
     };
   });
   return {
@@ -221,6 +225,7 @@ export function dataCatalog(
       NOTE_MESH,
       "ほかのサイトのページからブラウザで直接は読めない（CORS を許していない）。取ったファイルを自分のプロジェクトに置いて使う",
       "出典は、使ったデータの「出典」（attribution）の文を1行ずつ書く。非商用なら、出典を書けば自由に使える",
+      "決まりではないが、「データの入手元：」に続けて「入手元」（source）の文を添えると、版（日付）まで分かり、同じ時点のデータをたどれる",
     ],
     datasets,
   };
